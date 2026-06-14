@@ -1,0 +1,14 @@
+[program:queue-worker]
+process_name=%(program_name)s_%(process_num)02d
+command=/usr/local/bin/run-queue.sh
+numprocs=${QUEUE_CONCURRENCY}
+autostart=true
+autorestart=true
+startsecs=3
+startretries=10
+stopwaitsecs=3600
+stopsignal=TERM
+stdout_logfile=/dev/stdout
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/stderr
+stderr_logfile_maxbytes=0

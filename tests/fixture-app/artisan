@@ -1,0 +1,101 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+function logMessage(string $message): void
+{
+    fwrite(STDOUT, sprintf("[fixture-artisan] %s\n", $message));
+}
+
+function sleepLoop(string $role): int
+{
+    $running = true;
+
+    if (function_exists('pcntl_async_signals')) {
+        pcntl_async_signals(true);
+    }
+
+    if (function_exists('pcntl_signal')) {
+        pcntl_signal(SIGTERM, static function () use (&$running, $role): void {
+            logMessage("received SIGTERM for {$role}");
+            $running = false;
+        });
+        pcntl_signal(SIGINT, static function () use (&$running, $role): void {
+            logMessage("received SIGINT for {$role}");
+            $running = false;
+        });
+    }
+
+    logMessage("starting {$role}");
+
+    while ($running) {
+        sleep(5);
+        logMessage("heartbeat {$role}");
+    }
+
+    logMessage("stopping {$role}");
+
+    return 0;
+}
+
+$command = $argv[1] ?? null;
+
+if ($command === 'queue:work') {
+    exit(sleepLoop('queue-worker'));
+}
+
+if ($command === 'schedule:work') {
+    exit(sleepLoop('scheduler'));
+}
+
+if ($command === 'optimize:clear') {
+    logMessage('optimize cleared');
+    exit(0);
+}
+
+if ($command === 'migrate') {
+    logMessage('migrations completed');
+    exit(0);
+}
+
+if ($command === 'db:seed') {
+    logMessage('seeders completed');
+    exit(0);
+}
+
+if ($command === 'queue:restart') {
+    logMessage('queue restart signal stored');
+    exit(0);
+}
+
+if ($command === 'storage:link') {
+    $target = __DIR__ . '/storage/app/public';
+    $link = __DIR__ . '/public/storage';
+
+    if (!is_dir($target) && !mkdir($target, 0777, true) && !is_dir($target)) {
+        fwrite(STDERR, "[fixture-artisan] failed to prepare storage target\n");
+        exit(1);
+    }
+
+    if (is_link($link) || file_exists($link)) {
+        logMessage('storage link already present');
+        exit(0);
+    }
+
+    if (!symlink($target, $link)) {
+        fwrite(STDERR, "[fixture-artisan] failed to create storage symlink\n");
+        exit(1);
+    }
+
+    logMessage('storage link created');
+    exit(0);
+}
+
+if ($command === 'about') {
+    logMessage('fixture app ready');
+    exit(0);
+}
+
+fwrite(STDERR, "[fixture-artisan] unsupported command\n");
+exit(1);
