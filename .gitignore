@@ -1,0 +1,6 @@
+.env
+logs/
+tests/fixture-app/bootstrap/cache/*
+!tests/fixture-app/bootstrap/cache/.gitkeep
+tests/fixture-app/storage/logs/*
+!tests/fixture-app/storage/logs/.gitkeep

@@ -53,6 +53,25 @@ Base image Laravel modern berbasis `php:8.3-fpm-bookworm` dengan:
 - `QUEUE_BACKOFF`
 - `QUEUE_CONCURRENCY`
 
+## Cron Build And Push
+
+Script `scripts/cron-build-and-push.sh` membaca environment langsung, dan kalau ada file `.env` di root repo, file itu juga akan di-load otomatis.
+
+Untuk konfigurasi lokal:
+
+```bash
+cp .env.example .env
+```
+
+Variabel yang dipakai oleh wrapper cron:
+
+- `NTFY_URL`: endpoint ntfy tujuan, contoh `https://ntfy.sh/your-topic`
+- `NTFY_TITLE`: judul notifikasi, default `laravel-base cron build and push`
+- `LOCK_FILE`: file lock untuk mencegah dua job jalan bersamaan
+- `NO_CACHE`: diteruskan ke `push-image.sh`, default `true`
+
+Kalau `NTFY_URL` tidak diisi, script tetap berjalan normal tanpa notifikasi.
+
 ## Pakai Dengan Bind Mount
 
 Pola ini cocok untuk development atau environment yang source code-nya ingin langsung di-mount ke container.
