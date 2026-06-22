@@ -1,4 +1,4 @@
-ARG PHP_VERSION
+ARG PHP_VERSION=required
 FROM php:${PHP_VERSION}-fpm-bookworm
 
 ARG DEBIAN_FRONTEND=noninteractive
