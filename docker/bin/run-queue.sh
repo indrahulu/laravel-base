@@ -6,7 +6,6 @@ cd "${APP_ROOT:-/var/www/html}"
 args=(
   artisan
   queue:work
-  "${QUEUE_CONNECTION:-redis}"
   "--queue=${QUEUE_NAMES:-default}"
   "--sleep=${QUEUE_SLEEP:-3}"
   "--tries=${QUEUE_TRIES:-3}"

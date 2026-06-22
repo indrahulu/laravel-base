@@ -118,7 +118,6 @@ services:
     image: indrahulu/laravel-base:php8.4
     environment:
       APP_ROLE: worker
-      QUEUE_CONNECTION: redis
     volumes:
       - ./your-laravel-app:/var/www/html
 
@@ -182,7 +181,6 @@ services:
     image: yourorg/your-laravel-app:v1
     environment:
       APP_ROLE: worker
-      QUEUE_CONNECTION: redis
 
   scheduler:
     image: yourorg/your-laravel-app:v1
@@ -271,7 +269,7 @@ environment:
 | Variable | Default | Deskripsi |
 |----------|---------|----------|
 | `QUEUE_ENABLED` | `true` | Aktifkan queue worker |
-| `QUEUE_CONNECTION` | `redis` | Laravel queue connection |
+| `QUEUE_CONNECTION` | `database` | Laravel queue connection |
 | `QUEUE_NAMES` | `default` | Queue names (comma-separated) |
 | `QUEUE_CONCURRENCY` | `1` | Jumlah concurrent queue workers |
 | `QUEUE_SLEEP` | `3` | Detik tidur jika tidak ada job |
