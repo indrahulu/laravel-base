@@ -5,6 +5,7 @@ IMAGE_NAME="${IMAGE_NAME:-indrahulu/laravel-base}"
 PRIMARY_TAG="${PRIMARY_TAG:-php8.3}"
 BUILD_BEFORE_PUSH="${BUILD_BEFORE_PUSH:-true}"
 NO_CACHE="${NO_CACHE:-false}"
+RUN_SMOKE_BEFORE_PUSH="${RUN_SMOKE_BEFORE_PUSH:-false}"
 
 log() {
   printf '[push-image] %s\n' "$*"
@@ -20,6 +21,8 @@ Environment variables:
   PRIMARY_TAG         Primary tag to build and push. Default: php8.3
   BUILD_BEFORE_PUSH   Build image before push. true|false. Default: true
   NO_CACHE            Build with --no-cache. true|false. Default: false
+  RUN_SMOKE_BEFORE_PUSH
+                      Run tests/smoke-test.sh before push. true|false. Default: false
 
 Examples:
   ./scripts/push-image.sh
@@ -47,6 +50,33 @@ assert_docker_login() {
   fi
 }
 
+is_release_tag() {
+  [[ "${PRIMARY_TAG}" =~ ^release ]]
+}
+
+run_smoke_if_required() {
+  local should_run="${RUN_SMOKE_BEFORE_PUSH}"
+
+  if [[ "${should_run}" != "true" ]] && is_release_tag; then
+    should_run="true"
+    log "release tag detected; forcing smoke test before push"
+  fi
+
+  if [[ "${should_run}" != "true" ]]; then
+    log "smoke test skipped"
+    return
+  fi
+
+  if [[ ! -f "tests/smoke-test.sh" ]]; then
+    log "smoke test script not found at tests/smoke-test.sh"
+    exit 1
+  fi
+
+  log "running smoke test before push"
+  bash ./tests/smoke-test.sh
+  log "smoke test passed"
+}
+
 main() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     usage
@@ -69,6 +99,8 @@ main() {
   else
     log "skipping build for ${primary_ref}"
   fi
+
+  run_smoke_if_required
 
   local tag
   for tag in "${extra_tags[@]}"; do

@@ -17,6 +17,12 @@ log() {
   printf '[entrypoint] %s\n' "$*"
 }
 
+# Re-exec as root if not already root (needed for usermod, chown, etc.)
+if [[ "$(id -u)" -ne 0 ]]; then
+  log "Running as UID $(id -u), re-execing as root for setup"
+  exec gosu root "$0" "$@"
+fi
+
 is_numeric() {
   [[ "$1" =~ ^[0-9]+$ ]]
 }
@@ -252,6 +258,15 @@ opcache.revalidate_freq=$([[ "${PHP_OPCACHE_ENABLE:-true}" == "true" ]] && echo 
 EOF
 }
 
+prepare_runtime_directories() {
+  chmod 1777 /run
+  mkdir -p /run/php
+  chown -R www-data:www-data /run/php
+  chown -R www-data:www-data /var/lib/nginx 2>/dev/null || true
+  chown -R www-data:www-data /var/log/supervisor 2>/dev/null || true
+  chown -R www-data:www-data /etc/nginx/ssl 2>/dev/null || true
+}
+
 main() {
   configure_runtime_user
   validate_app
@@ -262,9 +277,10 @@ main() {
   write_php_fpm_config
   configure_php
   write_supervisor_programs
+  prepare_runtime_directories
 
-  log "Starting role ${APP_ROLE}"
-  exec "$@"
+  log "Starting role ${APP_ROLE} as www-data"
+  exec gosu www-data "$@"
 }
 
 main "$@"

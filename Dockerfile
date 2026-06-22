@@ -44,6 +44,7 @@ RUN apt-get update \
         curl \
         gettext-base \
         git \
+        gosu \
         imagemagick \
         libcurl4-openssl-dev \
         libfreetype6-dev \
@@ -129,6 +130,8 @@ WORKDIR /var/www/html
 EXPOSE 8080 8443
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 CMD ["/usr/local/bin/healthcheck.sh"]
+
+USER www-data
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["supervisord", "-c", "/etc/supervisor/supervisord.conf", "-n"]

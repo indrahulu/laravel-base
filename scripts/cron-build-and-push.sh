@@ -14,6 +14,7 @@ fi
 LOG_DIR="${LOG_DIR:-${REPO_ROOT}/logs}"
 LOCK_FILE="${LOCK_FILE:-/tmp/indrahulu-laravel-base-build.lock}"
 NO_CACHE="${NO_CACHE:-true}"
+RUN_SMOKE_BEFORE_PUSH="${RUN_SMOKE_BEFORE_PUSH:-true}"
 NTFY_URL="${NTFY_URL:-}"
 NTFY_TITLE="${NTFY_TITLE:-cron-build-and-push}"
 
@@ -113,7 +114,7 @@ main() {
 
   cd "${REPO_ROOT}"
   log "starting scheduled build and push"
-  NO_CACHE="${NO_CACHE}" "${REPO_ROOT}/scripts/push-image.sh" "$@"
+  NO_CACHE="${NO_CACHE}" RUN_SMOKE_BEFORE_PUSH="${RUN_SMOKE_BEFORE_PUSH}" "${REPO_ROOT}/scripts/push-image.sh" "$@"
   log "scheduled build and push finished"
 }
 
