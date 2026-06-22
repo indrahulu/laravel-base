@@ -8,20 +8,22 @@ Base image Laravel production-ready berbasis `php-fpm-bookworm` dengan:
 - Self-signed SSL certificate (sudah di-generate di `docker/ssl/`)
 - Dukungan multi versi PHP: `8.2`, `8.3`, `8.4`
 
+Image ini dibangun dari [https://github.com/indrahulu/laravel-base](https://github.com/indrahulu/laravel-base).
+
 ## Image Tags
 
 | Tag | Keterangan | Overwrite? |
 |-----|-----------|:----------:|
-| `php8.3` | Latest per versi PHP | ✅ |
-| `php8.3-v1.2.3` | Versioned, immutable | ❌ |
-| `php8.3-nightly` | Nightly build | ✅ |
+| `php8.4` | Latest per versi PHP | ✅ |
+| `php8.4-v1.2.3` | Versioned, immutable | ❌ |
+| `php8.4-nightly` | Nightly build | ✅ |
 
 Contoh pull:
 
 ```bash
-docker pull indrahulu/laravel-base:php8.3
-docker pull indrahulu/laravel-base:php8.3-v1.0.0
-docker pull indrahulu/laravel-base:php8.3-nightly
+docker pull indrahulu/laravel-base:php8.4
+docker pull indrahulu/laravel-base:php8.4-v1.0.0
+docker pull indrahulu/laravel-base:php8.4-nightly
 ```
 
 ## Build
@@ -29,9 +31,9 @@ docker pull indrahulu/laravel-base:php8.3-nightly
 Versi PHP ditentukan secara eksplisit via `--build-arg`. Build tanpa menentukan versi akan gagal.
 
 ```bash
+docker build --build-arg PHP_VERSION=8.4 -t indrahulu/laravel-base:php8.4 .
 docker build --build-arg PHP_VERSION=8.3 -t indrahulu/laravel-base:php8.3 .
 docker build --build-arg PHP_VERSION=8.2 -t indrahulu/laravel-base:php8.2 .
-docker build --build-arg PHP_VERSION=8.4 -t indrahulu/laravel-base:php8.4 .
 ```
 
 ## Smoke Test
@@ -46,15 +48,15 @@ Smoke test menjalankan 4 container (satu per role) dan memverifikasi:
 Container logs otomatis di-dump saat test selesai (sukses atau gagal).
 
 ```bash
+IMAGE=indrahulu/laravel-base:php8.4 bash tests/smoke-test.sh
 IMAGE=indrahulu/laravel-base:php8.3 bash tests/smoke-test.sh
 IMAGE=indrahulu/laravel-base:php8.2 bash tests/smoke-test.sh
-IMAGE=indrahulu/laravel-base:php8.4 bash tests/smoke-test.sh
 ```
 
 Dengan verifikasi PHP version:
 
 ```bash
-IMAGE=indrahulu/laravel-base:php8.3 EXPECTED_PHP_VERSION=8.3 bash tests/smoke-test.sh
+IMAGE=indrahulu/laravel-base:php8.4 EXPECTED_PHP_VERSION=8.4 bash tests/smoke-test.sh
 ```
 
 | Variable | Default | Deskripsi |
@@ -88,7 +90,7 @@ Pola ini cocok untuk development atau staging. Source code di-mount langsung dar
 ```yaml
 services:
   app:
-    image: indrahulu/laravel-base:php8.3
+    image: indrahulu/laravel-base:php8.4
     ports:
       - "8080:8080"
       - "8443:8443"
@@ -105,7 +107,7 @@ services:
 ```yaml
 services:
   web:
-    image: indrahulu/laravel-base:php8.3
+    image: indrahulu/laravel-base:php8.4
     ports:
       - "8080:8080"
       - "8443:8443"
@@ -115,7 +117,7 @@ services:
       - ./your-laravel-app:/var/www/html
 
   worker:
-    image: indrahulu/laravel-base:php8.3
+    image: indrahulu/laravel-base:php8.4
     environment:
       APP_ROLE: worker
       QUEUE_CONNECTION: redis
@@ -123,7 +125,7 @@ services:
       - ./your-laravel-app:/var/www/html
 
   scheduler:
-    image: indrahulu/laravel-base:php8.3
+    image: indrahulu/laravel-base:php8.4
     environment:
       APP_ROLE: scheduler
     volumes:
@@ -137,7 +139,7 @@ Pola ini cocok untuk production. Source code di-COPY ke dalam image, menghasilka
 **Dockerfile aplikasi:**
 
 ```dockerfile
-FROM indrahulu/laravel-base:php8.3
+FROM indrahulu/laravel-base:php8.4
 
 COPY --chown=www-data:www-data . /var/www/html
 
