@@ -153,26 +153,6 @@ run_boot_hooks() {
   fi
 }
 
-generate_ssl() {
-  local cert_path=/etc/nginx/ssl/selfsigned.crt
-  local key_path=/etc/nginx/ssl/selfsigned.key
-
-  if [[ "${SSL_SELF_SIGNED_ENABLE}" != "true" ]]; then
-    return
-  fi
-
-  if [[ -f "${cert_path}" && -f "${key_path}" ]]; then
-    return
-  fi
-
-  log "Generating self-signed certificate"
-  openssl req -x509 -nodes -newkey rsa:2048 \
-    -keyout "${key_path}" \
-    -out "${cert_path}" \
-    -days "${SSL_DAYS:-3650}" \
-    -subj "/C=${SSL_COUNTRY:-ID}/ST=${SSL_STATE:-Jakarta}/L=${SSL_LOCALITY:-Jakarta}/O=${SSL_ORGANIZATION:-indrahulu}/OU=${SSL_ORGANIZATIONAL_UNIT:-Laravel Base}/CN=${SSL_COMMON_NAME:-localhost}"
-}
-
 write_nginx_config() {
   envsubst '${APP_ROOT} ${NGINX_CLIENT_MAX_BODY_SIZE}' \
     < /etc/nginx/templates/default.conf.template \
@@ -272,7 +252,6 @@ main() {
   validate_app
   prepare_permissions
   run_boot_hooks
-  generate_ssl
   write_nginx_config
   write_php_fpm_config
   configure_php

@@ -1,9 +1,9 @@
 services:
   web:
-    image: indrahulu/laravel-base:php8.3
+    image: ${IMAGE:?IMAGE is required, e.g. IMAGE=indrahulu/laravel-base:php8.3}
     ports:
-      - "18080:8080"
-      - "18443:8443"
+      - "${WEB_HTTP_PORT:-18080}:8080"
+      - "${WEB_HTTPS_PORT:-18443}:8443"
     environment:
       APP_ROLE: web
       APP_HEALTHCHECK_PATH: /up
@@ -14,10 +14,10 @@ services:
       RUN_QUEUE_RESTART_ON_BOOT: ${RUN_QUEUE_RESTART_ON_BOOT:-false}
     volumes:
       - ./fixture-app:/var/www/html
-    restart: unless-stopped
+    restart: "no"
 
   worker:
-    image: indrahulu/laravel-base:php8.3
+    image: ${IMAGE:?IMAGE is required, e.g. IMAGE=indrahulu/laravel-base:php8.3}
     environment:
       APP_ROLE: worker
       APP_HEALTHCHECK_PATH: /up
@@ -28,12 +28,15 @@ services:
       RUN_QUEUE_RESTART_ON_BOOT: ${RUN_QUEUE_RESTART_ON_BOOT:-false}
       QUEUE_CONNECTION: redis
       QUEUE_NAMES: default
+    depends_on:
+      redis:
+        condition: service_started
     volumes:
       - ./fixture-app:/var/www/html
-    restart: unless-stopped
+    restart: "no"
 
   scheduler:
-    image: indrahulu/laravel-base:php8.3
+    image: ${IMAGE:?IMAGE is required, e.g. IMAGE=indrahulu/laravel-base:php8.3}
     environment:
       APP_ROLE: scheduler
       APP_HEALTHCHECK_PATH: /up
@@ -44,13 +47,13 @@ services:
       RUN_QUEUE_RESTART_ON_BOOT: ${RUN_QUEUE_RESTART_ON_BOOT:-false}
     volumes:
       - ./fixture-app:/var/www/html
-    restart: unless-stopped
+    restart: "no"
 
   all:
-    image: indrahulu/laravel-base:php8.3
+    image: ${IMAGE:?IMAGE is required, e.g. IMAGE=indrahulu/laravel-base:php8.3}
     ports:
-      - "28080:8080"
-      - "28443:8443"
+      - "${ALL_HTTP_PORT:-28080}:8080"
+      - "${ALL_HTTPS_PORT:-28443}:8443"
     environment:
       APP_ROLE: all
       APP_HEALTHCHECK_PATH: /up
@@ -61,6 +64,13 @@ services:
       RUN_QUEUE_RESTART_ON_BOOT: ${RUN_QUEUE_RESTART_ON_BOOT:-false}
       QUEUE_CONNECTION: redis
       QUEUE_NAMES: default
+    depends_on:
+      redis:
+        condition: service_started
     volumes:
       - ./fixture-app:/var/www/html
-    restart: unless-stopped
+    restart: "no"
+
+  redis:
+    image: redis:7-alpine
+    restart: "no"

@@ -1,88 +1,89 @@
-# indrahulu/laravel-base:php8.3
+# indrahulu/laravel-base
 
-Base image Laravel modern berbasis `php:8.3-fpm-bookworm` dengan:
+Base image Laravel production-ready berbasis `php-fpm-bookworm` dengan:
 
-- `nginx`
-- `php-fpm`
-- `supervisor`
-- `composer`
-- `opcache`
-- `gd`
-- `imagick`
-- `sockets`
-- `redis` PHP extension
-- role `web`, `worker`, `scheduler`, `all`
-- HTTP `8080` dan HTTPS `8443` dengan self-signed cert
+- `nginx`, `php-fpm`, `supervisor`, `composer`
+- Extensions: `opcache`, `gd`, `imagick`, `sockets`, `redis`
+- 4 runtime roles: `web`, `worker`, `scheduler`, `all`
+- Self-signed SSL certificate (sudah di-generate di `docker/ssl/`)
+- Dukungan multi versi PHP: `8.2`, `8.3`, `8.4`
 
-## Runtime Roles
+## Image Tags
 
-- `APP_ROLE=web`: `php-fpm + nginx`
-- `APP_ROLE=worker`: `php artisan queue:work`
-- `APP_ROLE=scheduler`: `php artisan schedule:work`
-- `APP_ROLE=all`: semua proses aktif lewat `supervisor`
+| Tag | Keterangan | Overwrite? |
+|-----|-----------|:----------:|
+| `php8.3` | Latest per versi PHP | ✅ |
+| `php8.3-v1.2.3` | Versioned, immutable | ❌ |
+| `php8.3-nightly` | Nightly build | ✅ |
 
-## Environment Variables
-
-- `APP_ROLE`
-- `APP_ROOT`
-- `APP_UID`
-- `APP_GID`
-- `APP_HEALTHCHECK_PATH`
-- `SSL_SELF_SIGNED_ENABLE`
-- `PHP_MEMORY_LIMIT`
-- `PHP_OPCACHE_ENABLE`
-- `NGINX_CLIENT_MAX_BODY_SIZE`
-- `PHP_FPM_PM_MAX_CHILDREN`
-- `PHP_FPM_PM_START_SERVERS`
-- `PHP_FPM_PM_MIN_SPARE_SERVERS`
-- `PHP_FPM_PM_MAX_SPARE_SERVERS`
-- `PHP_FPM_PM_MAX_REQUESTS`
-- `RUN_OPTIMIZE_CLEAR_ON_BOOT`
-- `RUN_STORAGE_LINK_ON_BOOT`
-- `RUN_MIGRATIONS_ON_BOOT`
-- `RUN_SEEDERS_ON_BOOT`
-- `RUN_QUEUE_RESTART_ON_BOOT`
-- `QUEUE_ENABLED`
-- `QUEUE_CONNECTION`
-- `QUEUE_NAMES`
-- `QUEUE_SLEEP`
-- `QUEUE_TRIES`
-- `QUEUE_TIMEOUT`
-- `QUEUE_MAX_JOBS`
-- `QUEUE_MAX_TIME`
-- `QUEUE_BACKOFF`
-- `QUEUE_CONCURRENCY`
-
-## Cron Build And Push
-
-Script `scripts/cron-build-and-push.sh` membaca environment langsung, dan kalau ada file `.env` di root repo, file itu juga akan di-load otomatis.
-
-Untuk konfigurasi lokal:
+Contoh pull:
 
 ```bash
-cp .env.example .env
+docker pull indrahulu/laravel-base:php8.3
+docker pull indrahulu/laravel-base:php8.3-v1.0.0
+docker pull indrahulu/laravel-base:php8.3-nightly
 ```
 
-Variabel yang dipakai oleh wrapper cron:
+## Build
 
-- `NTFY_URL`: endpoint ntfy tujuan, contoh `https://ntfy.sh/your-topic`
-- `NTFY_TITLE`: judul notifikasi, default `laravel-base cron build and push`
-- `LOCK_FILE`: file lock untuk mencegah dua job jalan bersamaan
-- `NO_CACHE`: diteruskan ke `push-image.sh`, default `true`
-
-Kalau `NTFY_URL` tidak diisi, script tetap berjalan normal tanpa notifikasi.
-
-## Pakai Dengan Bind Mount
-
-Pola ini cocok untuk development atau environment yang source code-nya ingin langsung di-mount ke container.
+Versi PHP ditentukan secara eksplisit via `--build-arg`. Build tanpa menentukan versi akan gagal.
 
 ```bash
-docker compose -f docker-compose-example.yml up -d
+docker build --build-arg PHP_VERSION=8.3 -t indrahulu/laravel-base:php8.3 .
+docker build --build-arg PHP_VERSION=8.2 -t indrahulu/laravel-base:php8.2 .
+docker build --build-arg PHP_VERSION=8.4 -t indrahulu/laravel-base:php8.4 .
 ```
 
-`docker-compose-example.yml` mengasumsikan source aplikasi Laravel tersedia di `./example-app` dan memakai image `indrahulu/laravel-base:php8.3` yang sudah ada di registry lokal atau Docker Hub. Ganti path volume itu sesuai struktur repo aplikasi Anda.
+## Smoke Test
 
-Contoh inti:
+Smoke test menjalankan 4 container (satu per role) dan memverifikasi:
+
+- Container `running` dan `healthy`
+- PHP version sesuai ekspektasi
+- Process `queue:work` dan `schedule:work` aktif
+- HTTP dan HTTPS endpoint merespons
+
+Container logs otomatis di-dump saat test selesai (sukses atau gagal).
+
+```bash
+IMAGE=indrahulu/laravel-base:php8.3 bash tests/smoke-test.sh
+IMAGE=indrahulu/laravel-base:php8.2 bash tests/smoke-test.sh
+IMAGE=indrahulu/laravel-base:php8.4 bash tests/smoke-test.sh
+```
+
+Dengan verifikasi PHP version:
+
+```bash
+IMAGE=indrahulu/laravel-base:php8.3 EXPECTED_PHP_VERSION=8.3 bash tests/smoke-test.sh
+```
+
+| Variable | Default | Deskripsi |
+|----------|---------|----------|
+| `IMAGE` | *(wajib)* | Image yang akan di-test |
+| `EXPECTED_PHP_VERSION` | *(kosong = skip)* | Verifikasi PHP version di container |
+| `WEB_HTTP_PORT` | `18080` | Port HTTP untuk role `web` |
+| `WEB_HTTPS_PORT` | `18443` | Port HTTPS untuk role `web` |
+| `ALL_HTTP_PORT` | `28080` | Port HTTP untuk role `all` |
+| `ALL_HTTPS_PORT` | `28443` | Port HTTPS untuk role `all` |
+
+## Usage
+
+### Runtime Roles
+
+Diatur via environment variable `APP_ROLE`:
+
+| Role | Proses yang Berjalan |
+|------|---------------------|
+| `web` | `php-fpm` + `nginx` |
+| `worker` | `php artisan queue:work` |
+| `scheduler` | `php artisan schedule:work` |
+| `all` | Semua proses via `supervisor` |
+
+### Bind Mount
+
+Pola ini cocok untuk development atau staging. Source code di-mount langsung dari host ke container.
+
+**Single container (semua role):**
 
 ```yaml
 services:
@@ -99,13 +100,41 @@ services:
       - ./your-laravel-app:/var/www/html
 ```
 
-Untuk mode bind mount di Linux host, Anda biasanya juga ingin menyelaraskan UID/GID container dengan user host lewat `APP_UID` dan `APP_GID`.
+**Split roles (production-like):**
 
-## Pakai Dengan Application Image Sendiri
+```yaml
+services:
+  web:
+    image: indrahulu/laravel-base:php8.3
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    environment:
+      APP_ROLE: web
+    volumes:
+      - ./your-laravel-app:/var/www/html
 
-Pola ini lebih cocok untuk deployment yang ingin image aplikasi immutable.
+  worker:
+    image: indrahulu/laravel-base:php8.3
+    environment:
+      APP_ROLE: worker
+      QUEUE_CONNECTION: redis
+    volumes:
+      - ./your-laravel-app:/var/www/html
 
-Contoh `Dockerfile` aplikasi:
+  scheduler:
+    image: indrahulu/laravel-base:php8.3
+    environment:
+      APP_ROLE: scheduler
+    volumes:
+      - ./your-laravel-app:/var/www/html
+```
+
+### Build Immutable Image
+
+Pola ini cocok untuk production. Source code di-COPY ke dalam image, menghasilkan image yang immutable dan reproducible.
+
+**Dockerfile aplikasi:**
 
 ```dockerfile
 FROM indrahulu/laravel-base:php8.3
@@ -118,20 +147,52 @@ RUN composer install --no-dev --optimize-autoloader \
     && php artisan view:cache
 ```
 
-Lalu build image aplikasi Anda:
+Build:
 
 ```bash
-docker build -t yourorg/your-laravel-app:latest .
+docker build -t yourorg/your-laravel-app:v1 .
 ```
 
-Setelah itu jalankan image aplikasi tersebut seperti biasa, misalnya dengan `APP_ROLE=all` atau dipisah menjadi `web`, `worker`, dan `scheduler`.
+**Single container:**
 
-## User And Permissions
+```yaml
+services:
+  app:
+    image: yourorg/your-laravel-app:v1
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    environment:
+      APP_ROLE: all
+```
 
-Default-nya container memakai user internal `www-data` untuk proses PHP-FPM, sedangkan `supervisord` berjalan sebagai `root`.
+**Split roles:**
 
-- Untuk application image hasil `COPY`, pola ini biasanya sudah cukup.
-- Untuk bind mount di Linux host, Anda bisa menyelaraskan UID/GID `www-data` dengan user host:
+```yaml
+services:
+  web:
+    image: yourorg/your-laravel-app:v1
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    environment:
+      APP_ROLE: web
+
+  worker:
+    image: yourorg/your-laravel-app:v1
+    environment:
+      APP_ROLE: worker
+      QUEUE_CONNECTION: redis
+
+  scheduler:
+    image: yourorg/your-laravel-app:v1
+    environment:
+      APP_ROLE: scheduler
+```
+
+### Override UID/GID
+
+Default-nya container memakai user `www-data`. Untuk bind mount di Linux host, Anda bisa menyelaraskan UID/GID container dengan user host agar permission file konsisten:
 
 ```yaml
 environment:
@@ -139,35 +200,27 @@ environment:
   APP_GID: "1000"
 ```
 
-Perilakunya:
+Perilaku:
 
-- jika `APP_UID` dan/atau `APP_GID` diisi, entrypoint akan mengubah UID/GID `www-data` saat startup
-- image ini tetap hanya merapikan permission `${APP_ROOT}/storage` dan `${APP_ROOT}/bootstrap/cache`
-- image ini tidak otomatis `chown` seluruh source tree yang di-mount
+- Jika `APP_UID` dan/atau `APP_GID` diisi, entrypoint akan mengubah UID/GID `www-data` saat startup
+- Hanya merapikan permission `${APP_ROOT}/storage` dan `${APP_ROOT}/bootstrap/cache`
+- Tidak otomatis `chown` seluruh source tree yang di-mount (sengaja, agar bind mount tidak kena `chown -R` besar)
 
-Ini sengaja supaya bind mount tidak kena `chown -R` besar saat container start.
+Untuk immutable image (`COPY`), UID/GID override biasanya tidak diperlukan.
 
-## Boot Hooks
+### Boot Hooks
 
-Semua boot hook default-nya non-aktif dan hanya relevan untuk role `web` dan `all`.
+Boot hook dijalankan sebelum service utama start. Default-nya non-aktif dan hanya relevan untuk role `web` dan `all`.
 
-- `RUN_OPTIMIZE_CLEAR_ON_BOOT=true` menjalankan `php artisan optimize:clear`
-- `RUN_STORAGE_LINK_ON_BOOT=true` menjalankan `php artisan storage:link`
-- `RUN_MIGRATIONS_ON_BOOT=true` menjalankan `php artisan migrate --force`
-- `RUN_SEEDERS_ON_BOOT=true` menjalankan `php artisan db:seed --force`
-- `RUN_QUEUE_RESTART_ON_BOOT=true` menjalankan `php artisan queue:restart`
+| Flag | Command |
+|------|---------|
+| `RUN_OPTIMIZE_CLEAR_ON_BOOT=true` | `php artisan optimize:clear` |
+| `RUN_STORAGE_LINK_ON_BOOT=true` | `php artisan storage:link` |
+| `RUN_MIGRATIONS_ON_BOOT=true` | `php artisan migrate --force` |
+| `RUN_SEEDERS_ON_BOOT=true` | `php artisan db:seed --force` |
+| `RUN_QUEUE_RESTART_ON_BOOT=true` | `php artisan queue:restart` |
 
-Urutan eksekusi saat beberapa flag aktif:
-
-1. `optimize:clear`
-2. `storage:link`
-3. `migrate --force`
-4. `db:seed --force`
-5. `queue:restart`
-
-Jika command gagal, image ini akan mencetak warning dan tetap melanjutkan startup service utama.
-
-Contoh:
+Urutan eksekusi sesuai tabel di atas. Jika command gagal, image mencetak warning dan tetap melanjutkan startup.
 
 ```yaml
 environment:
@@ -175,6 +228,65 @@ environment:
   RUN_OPTIMIZE_CLEAR_ON_BOOT: "true"
   RUN_STORAGE_LINK_ON_BOOT: "true"
   RUN_MIGRATIONS_ON_BOOT: "true"
-  RUN_SEEDERS_ON_BOOT: "true"
-  RUN_QUEUE_RESTART_ON_BOOT: "true"
 ```
+
+### Environment Variables
+
+**App**
+
+| Variable | Default | Deskripsi |
+|----------|---------|----------|
+| `APP_ROLE` | `web` | Runtime role: `web`, `worker`, `scheduler`, `all` |
+| `APP_ROOT` | `/var/www/html` | Path ke Laravel application root |
+| `APP_UID` | *(kosong)* | Override UID `www-data` |
+| `APP_GID` | *(kosong)* | Override GID `www-data` |
+| `APP_HEALTHCHECK_PATH` | `/up` | Path endpoint healthcheck |
+
+**PHP**
+
+| Variable | Default | Deskripsi |
+|----------|---------|----------|
+| `PHP_MEMORY_LIMIT` | `512M` | PHP memory limit |
+| `PHP_OPCACHE_ENABLE` | `true` | Aktifkan opcache |
+
+**PHP-FPM**
+
+| Variable | Default | Deskripsi |
+|----------|---------|----------|
+| `PHP_FPM_PM_MAX_CHILDREN` | `20` | Max worker processes |
+| `PHP_FPM_PM_START_SERVERS` | `4` | Jumlah worker saat start |
+| `PHP_FPM_PM_MIN_SPARE_SERVERS` | `2` | Min idle workers |
+| `PHP_FPM_PM_MAX_SPARE_SERVERS` | `6` | Max idle workers |
+| `PHP_FPM_PM_MAX_REQUESTS` | `500` | Max request per worker sebelum restart |
+
+**Nginx**
+
+| Variable | Default | Deskripsi |
+|----------|---------|----------|
+| `NGINX_CLIENT_MAX_BODY_SIZE` | `64m` | Max upload size |
+| `SSL_SELF_SIGNED_ENABLE` | `true` | Aktifkan HTTPS dengan self-signed cert |
+
+**Queue**
+
+| Variable | Default | Deskripsi |
+|----------|---------|----------|
+| `QUEUE_ENABLED` | `true` | Aktifkan queue worker |
+| `QUEUE_CONNECTION` | `redis` | Laravel queue connection |
+| `QUEUE_NAMES` | `default` | Queue names (comma-separated) |
+| `QUEUE_CONCURRENCY` | `1` | Jumlah concurrent queue workers |
+| `QUEUE_SLEEP` | `3` | Detik tidur jika tidak ada job |
+| `QUEUE_TRIES` | `3` | Max retry per job |
+| `QUEUE_TIMEOUT` | `90` | Detik timeout per job |
+| `QUEUE_MAX_JOBS` | `0` | Max jobs per worker (0 = unlimited) |
+| `QUEUE_MAX_TIME` | `0` | Max waktu worker dalam detik (0 = unlimited) |
+| `QUEUE_BACKOFF` | `0` | Detik delay antar retry |
+
+**Boot Hooks**
+
+| Variable | Default | Deskripsi |
+|----------|---------|----------|
+| `RUN_OPTIMIZE_CLEAR_ON_BOOT` | `false` | Jalankan `php artisan optimize:clear` |
+| `RUN_STORAGE_LINK_ON_BOOT` | `false` | Jalankan `php artisan storage:link` |
+| `RUN_MIGRATIONS_ON_BOOT` | `false` | Jalankan `php artisan migrate --force` |
+| `RUN_SEEDERS_ON_BOOT` | `false` | Jalankan `php artisan db:seed --force` |
+| `RUN_QUEUE_RESTART_ON_BOOT` | `false` | Jalankan `php artisan queue:restart` |

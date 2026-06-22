@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  pull_request:
+    branches: [master]
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+env:
+  REGISTRY: indrahulu/laravel-base
+
+jobs:
+  build-test-push:
+    strategy:
+      fail-fast: true
+      matrix:
+        php: ["8.2", "8.3", "8.4"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: >
+          docker build
+          --build-arg PHP_VERSION=${{ matrix.php }}
+          -t ${{ env.REGISTRY }}:php${{ matrix.php }}
+          .
+
+      - name: Smoke test
+        env:
+          IMAGE: ${{ env.REGISTRY }}:php${{ matrix.php }}
+          EXPECTED_PHP_VERSION: ${{ matrix.php }}
+        run: bash tests/smoke-test.sh
+
+      - name: Login to Docker Hub
+        if: >
+          github.event_name == 'workflow_dispatch' ||
+          github.event_name == 'schedule' ||
+          startsWith(github.ref, 'refs/tags/v')
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push image
+        if: >
+          github.event_name == 'workflow_dispatch' ||
+          github.event_name == 'schedule' ||
+          startsWith(github.ref, 'refs/tags/v')
+        run: |
+          REGISTRY="${{ env.REGISTRY }}"
+          PHP="${{ matrix.php }}"
+          IMAGE="${REGISTRY}:php${PHP}"
+
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            echo "Pushing nightly tag"
+            docker tag "${IMAGE}" "${REGISTRY}:php${PHP}-nightly"
+            docker push "${REGISTRY}:php${PHP}-nightly"
+
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+            echo "Pushing versioned tag: php${PHP}-v${VERSION}"
+            docker tag "${IMAGE}" "${REGISTRY}:php${PHP}-v${VERSION}"
+            docker push "${REGISTRY}:php${PHP}-v${VERSION}"
+            echo "Pushing latest tag: php${PHP}"
+            docker push "${IMAGE}"
+
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "Pushing latest tag"
+            docker push "${IMAGE}"
+
+          else
+            echo "No push condition matched"
+            exit 1
+          fi
+
+  cleanup:
+    needs: build-test-push
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cleanup old versioned tags
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        run: bash scripts/cleanup-old-tags.sh

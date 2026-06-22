@@ -1,4 +1,5 @@
-FROM php:8.3-fpm-bookworm
+ARG PHP_VERSION
+FROM php:${PHP_VERSION}-fpm-bookworm
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -30,14 +31,7 @@ ENV APP_ROOT=/var/www/html \
     QUEUE_MAX_TIME=0 \
     QUEUE_BACKOFF=0 \
     QUEUE_CONCURRENCY=1 \
-    APP_HEALTHCHECK_PATH=/up \
-    SSL_COUNTRY=ID \
-    SSL_STATE=Jakarta \
-    SSL_LOCALITY=Jakarta \
-    SSL_ORGANIZATION=indrahulu \
-    SSL_ORGANIZATIONAL_UNIT="Laravel Base" \
-    SSL_COMMON_NAME=localhost \
-    SSL_DAYS=3650
+    APP_HEALTHCHECK_PATH=/up
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -106,6 +100,9 @@ RUN mkdir -p \
         /var/log/laravel-base \
         /var/www/html \
     && chown -R www-data:www-data /var/www/html
+
+COPY docker/ssl/selfsigned.key /etc/nginx/ssl/selfsigned.key
+COPY docker/ssl/selfsigned.crt /etc/nginx/ssl/selfsigned.crt
 
 COPY docker/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY docker/nginx/default.conf.template /etc/nginx/templates/default.conf.template
