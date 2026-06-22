@@ -1,14 +1,12 @@
 # indrahulu/laravel-base
 
-Base image Laravel production-ready berbasis `php-fpm-bookworm` dengan:
+Image ini dibangun dari [https://github.com/indrahulu/laravel-base](https://github.com/indrahulu/laravel-base). Base image Laravel production-ready berbasis `php-fpm-bookworm` dengan:
 
 - `nginx`, `php-fpm`, `supervisor`, `composer`
 - Extensions: `opcache`, `gd`, `imagick`, `sockets`, `redis`
 - 4 runtime roles: `web`, `worker`, `scheduler`, `all`
 - Self-signed SSL certificate (sudah di-generate di `docker/ssl/`)
 - Dukungan multi versi PHP: `8.2`, `8.3`, `8.4`
-
-Image ini dibangun dari [https://github.com/indrahulu/laravel-base](https://github.com/indrahulu/laravel-base).
 
 ## Image Tags
 
