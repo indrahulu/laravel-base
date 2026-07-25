@@ -1,24 +1,42 @@
 # indrahulu/laravel-base
 
-Image ini dibangun dari [https://github.com/indrahulu/laravel-base](https://github.com/indrahulu/laravel-base). Base image Laravel production-ready berbasis `php-fpm-bookworm` dengan:
+Base image Laravel production-ready berbasis `php-fpm-bookworm` dengan:
 
 - `nginx`, `php-fpm`, `supervisor`, `composer`
 - Extensions: `opcache`, `gd`, `imagick`, `sockets`, `redis`
 - 4 runtime roles: `web`, `worker`, `scheduler`, `all`
 - Self-signed SSL certificate (sudah di-generate di `docker/ssl/`)
-- Dukungan multi versi PHP: `8.2`, `8.3`, `8.4`
+- Dukungan multi versi PHP: `8.2`, `8.3`, `8.4`, `8.5`
+
+Image ini dibangun dari [https://github.com/indrahulu/laravel-base](https://github.com/indrahulu/laravel-base).
+
+Image final hasil build dan push bisa diakses di:
+
+- https://hub.docker.com/r/indrahulu/laravel-base
 
 ## Image Tags
 
-| Tag | Keterangan | Overwrite? |
+| Tag | Deskripsi | Push Otomatis |
 |-----|-----------|:----------:|
+| `php8.5` | Latest per versi PHP | ✅ |
+| `php8.5-v1.2.3` | Versioned, immutable | ❌ |
+| `php8.5-nightly` | Nightly build | ✅ |
 | `php8.4` | Latest per versi PHP | ✅ |
 | `php8.4-v1.2.3` | Versioned, immutable | ❌ |
 | `php8.4-nightly` | Nightly build | ✅ |
+| `php8.3` | Latest per versi PHP | ✅ |
+| `php8.3-v1.2.3` | Versioned, immutable | ❌ |
+| `php8.3-nightly` | Nightly build | ✅ |
+| `php8.2` | Latest per versi PHP | ✅ |
+| `php8.2-v1.2.3` | Versioned, immutable | ❌ |
+| `php8.2-nightly` | Nightly build | ✅ |
 
 Contoh pull:
 
 ```bash
+docker pull indrahulu/laravel-base:php8.5
+docker pull indrahulu/laravel-base:php8.5-v1.0.0
+docker pull indrahulu/laravel-base:php8.5-nightly
 docker pull indrahulu/laravel-base:php8.4
 docker pull indrahulu/laravel-base:php8.4-v1.0.0
 docker pull indrahulu/laravel-base:php8.4-nightly
@@ -29,6 +47,7 @@ docker pull indrahulu/laravel-base:php8.4-nightly
 Versi PHP ditentukan secara eksplisit via `--build-arg`. Build tanpa menentukan versi akan gagal.
 
 ```bash
+docker build --build-arg PHP_VERSION=8.5 -t indrahulu/laravel-base:php8.5 .
 docker build --build-arg PHP_VERSION=8.4 -t indrahulu/laravel-base:php8.4 .
 docker build --build-arg PHP_VERSION=8.3 -t indrahulu/laravel-base:php8.3 .
 docker build --build-arg PHP_VERSION=8.2 -t indrahulu/laravel-base:php8.2 .
@@ -46,6 +65,7 @@ Smoke test menjalankan 4 container (satu per role) dan memverifikasi:
 Container logs otomatis di-dump saat test selesai (sukses atau gagal).
 
 ```bash
+IMAGE=indrahulu/laravel-base:php8.5 bash tests/smoke-test.sh
 IMAGE=indrahulu/laravel-base:php8.4 bash tests/smoke-test.sh
 IMAGE=indrahulu/laravel-base:php8.3 bash tests/smoke-test.sh
 IMAGE=indrahulu/laravel-base:php8.2 bash tests/smoke-test.sh
@@ -54,6 +74,7 @@ IMAGE=indrahulu/laravel-base:php8.2 bash tests/smoke-test.sh
 Dengan verifikasi PHP version:
 
 ```bash
+IMAGE=indrahulu/laravel-base:php8.5 EXPECTED_PHP_VERSION=8.5 bash tests/smoke-test.sh
 IMAGE=indrahulu/laravel-base:php8.4 EXPECTED_PHP_VERSION=8.4 bash tests/smoke-test.sh
 ```
 
@@ -88,7 +109,7 @@ Pola ini cocok untuk development atau staging. Source code di-mount langsung dar
 ```yaml
 services:
   app:
-    image: indrahulu/laravel-base:php8.4
+    image: indrahulu/laravel-base:php8.5
     ports:
       - "8080:8080"
       - "8443:8443"
@@ -105,7 +126,7 @@ services:
 ```yaml
 services:
   web:
-    image: indrahulu/laravel-base:php8.4
+    image: indrahulu/laravel-base:php8.5
     ports:
       - "8080:8080"
       - "8443:8443"
@@ -115,14 +136,14 @@ services:
       - ./your-laravel-app:/var/www/html
 
   worker:
-    image: indrahulu/laravel-base:php8.4
+    image: indrahulu/laravel-base:php8.5
     environment:
       APP_ROLE: worker
     volumes:
       - ./your-laravel-app:/var/www/html
 
   scheduler:
-    image: indrahulu/laravel-base:php8.4
+    image: indrahulu/laravel-base:php8.5
     environment:
       APP_ROLE: scheduler
     volumes:
@@ -136,7 +157,7 @@ Pola ini cocok untuk production. Source code di-COPY ke dalam image, menghasilka
 **Dockerfile aplikasi:**
 
 ```dockerfile
-FROM indrahulu/laravel-base:php8.4
+FROM indrahulu/laravel-base:php8.5
 
 COPY --chown=www-data:www-data . /var/www/html
 

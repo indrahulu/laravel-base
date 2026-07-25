@@ -134,7 +134,7 @@ main() {
     return 0
   fi
 
-  # Group by PHP version prefix (e.g. php8.2, php8.3, php8.4)
+  # Group by PHP version prefix (e.g. php8.2, php8.3, php8.4, php8.5)
   local php_versions
   php_versions="$(printf '%s' "${versioned_tags}" | jq -r '[.[].name | capture("^(?<prefix>php[0-9]+\\.[0-9]+)-v.*") | .prefix] | unique | .[]')"
 
