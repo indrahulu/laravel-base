@@ -259,7 +259,10 @@ environment:
 | `APP_ROOT` | `/var/www/html` | Path ke Laravel application root |
 | `APP_UID` | *(kosong)* | Override UID `www-data` |
 | `APP_GID` | *(kosong)* | Override GID `www-data` |
-| `APP_HEALTHCHECK_PATH` | `/up` | Path endpoint healthcheck |
+| `APP_HEALTHCHECK_PATH` | `/up` | Path endpoint healthcheck absolut |
+| `TZ` | `Asia/Jakarta` | IANA timezone runtime; dapat di-override tanpa rebuild image |
+
+Entrypoint memvalidasi role, boolean flag, path absolut, UID/GID numerik, nilai PHP-FPM numerik, serta opsi queue numerik sebelum service dimulai. `TZ` harus berupa IANA timezone yang tersedia di image.
 
 **PHP**
 

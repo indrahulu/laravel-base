@@ -19,7 +19,7 @@ run_compose() {
 
 cleanup() {
   log "dumping container logs for diagnostics"
-  for service in web worker scheduler all redis; do
+  for service in web worker scheduler all timezone redis; do
     log "--- logs: ${service} ---"
     run_compose logs --tail=50 "${service}" 2>&1 || true
   done
@@ -95,6 +95,39 @@ assert_php_version() {
   fi
 }
 
+assert_timezone() {
+  local service="$1"
+  local expected="$2"
+  local cid php_timezone os_timezone
+
+  cid="$(run_compose ps -q "${service}")"
+  if [[ -z "${cid}" ]]; then
+    log "service ${service} has no container id"
+    return 1
+  fi
+
+  php_timezone="$(docker exec "${cid}" php -r 'echo date_default_timezone_get();')"
+  os_timezone="$(MSYS_NO_PATHCONV=1 docker exec "${cid}" cat /etc/timezone)"
+  [[ "${php_timezone}" == "${expected}" && "${os_timezone}" == "${expected}" ]]
+}
+
+assert_startup_rejected() {
+  local description="$1"
+  local expected_message="$2"
+  shift 2
+
+  local output
+  if output="$(docker run --rm "$@" "${IMAGE}" 2>&1)"; then
+    log "${description} unexpectedly started"
+    return 1
+  fi
+
+  if [[ "${output}" != *"${expected_message}"* ]]; then
+    log "${description} failed with unexpected output: ${output}"
+    return 1
+  fi
+}
+
 wait_for() {
   local description="$1"
   local command="$2"
@@ -136,6 +169,25 @@ main() {
   else
     log "EXPECTED_PHP_VERSION not set, skipping PHP version check"
   fi
+
+  log "checking timezones"
+  for service in web worker scheduler all; do
+    wait_for "${service} default timezone" "assert_timezone ${service} Asia/Jakarta"
+  done
+  run_compose --profile checks up -d timezone
+  wait_for "timezone running" "assert_running timezone"
+  wait_for "override timezone" "assert_timezone timezone Etc/UTC"
+
+  log "checking invalid configuration"
+  assert_startup_rejected "invalid APP_ROLE" "APP_ROLE must be one of" -e APP_ROLE=invalid
+  assert_startup_rejected "invalid boolean" "PHP_OPCACHE_ENABLE must be true or false" -e PHP_OPCACHE_ENABLE=invalid
+  assert_startup_rejected "invalid app path" "APP_ROOT must be an absolute path" -e APP_ROOT=relative
+  assert_startup_rejected "invalid health path" "APP_HEALTHCHECK_PATH must be an absolute path" -e APP_HEALTHCHECK_PATH=relative
+  assert_startup_rejected "invalid UID" "APP_UID must be numeric" -e APP_UID=invalid
+  assert_startup_rejected "invalid GID" "APP_GID must be numeric" -e APP_GID=invalid
+  assert_startup_rejected "invalid PHP-FPM value" "PHP_FPM_PM_MAX_CHILDREN must be numeric" -e PHP_FPM_PM_MAX_CHILDREN=invalid
+  assert_startup_rejected "invalid queue value" "QUEUE_SLEEP must be numeric" -e QUEUE_SLEEP=invalid
+  assert_startup_rejected "invalid timezone" "TZ must be a valid IANA timezone" -e TZ=Mars/Olympus
 
   log "checking worker queue process"
   wait_for "worker process" "assert_process_running worker 'queue:work'"

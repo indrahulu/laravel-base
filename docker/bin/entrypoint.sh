@@ -3,6 +3,7 @@ set -Eeuo pipefail
 
 APP_ROOT="${APP_ROOT:-/var/www/html}"
 APP_ROLE="${APP_ROLE:-web}"
+APP_HEALTHCHECK_PATH="${APP_HEALTHCHECK_PATH:-/up}"
 APP_UID="${APP_UID:-}"
 APP_GID="${APP_GID:-}"
 SSL_SELF_SIGNED_ENABLE="${SSL_SELF_SIGNED_ENABLE:-true}"
@@ -12,6 +13,7 @@ RUN_STORAGE_LINK_ON_BOOT="${RUN_STORAGE_LINK_ON_BOOT:-false}"
 RUN_MIGRATIONS_ON_BOOT="${RUN_MIGRATIONS_ON_BOOT:-false}"
 RUN_SEEDERS_ON_BOOT="${RUN_SEEDERS_ON_BOOT:-false}"
 RUN_QUEUE_RESTART_ON_BOOT="${RUN_QUEUE_RESTART_ON_BOOT:-false}"
+TZ="${TZ-Asia/Jakarta}"
 
 log() {
   printf '[entrypoint] %s\n' "$*"
@@ -25,6 +27,78 @@ fi
 
 is_numeric() {
   [[ "$1" =~ ^[0-9]+$ ]]
+}
+
+validate_boolean() {
+  local name="$1"
+  local value="$2"
+
+  if [[ "${value}" != "true" && "${value}" != "false" ]]; then
+    log "${name} must be true or false; got '${value}'"
+    exit 1
+  fi
+}
+
+validate_numeric() {
+  local name="$1"
+  local value="$2"
+
+  if ! is_numeric "${value}"; then
+    log "${name} must be numeric; got '${value}'"
+    exit 1
+  fi
+}
+
+validate_configuration() {
+  case "${APP_ROLE}" in
+    web|worker|scheduler|all) ;;
+    *)
+      log "APP_ROLE must be one of: web, worker, scheduler, all; got '${APP_ROLE}'"
+      exit 1
+      ;;
+  esac
+
+  [[ "${APP_ROOT}" == /* ]] || {
+    log "APP_ROOT must be an absolute path; got '${APP_ROOT}'"
+    exit 1
+  }
+
+  [[ "${APP_HEALTHCHECK_PATH}" == /* ]] || {
+    log "APP_HEALTHCHECK_PATH must be an absolute path; got '${APP_HEALTHCHECK_PATH}'"
+    exit 1
+  }
+
+  if [[ "${TZ}" == /* || "${TZ}" == *..* || ! -f "/usr/share/zoneinfo/${TZ}" ]]; then
+    log "TZ must be a valid IANA timezone; got '${TZ}'"
+    exit 1
+  fi
+
+  validate_boolean SSL_SELF_SIGNED_ENABLE "${SSL_SELF_SIGNED_ENABLE}"
+  validate_boolean QUEUE_ENABLED "${QUEUE_ENABLED}"
+  validate_boolean PHP_OPCACHE_ENABLE "${PHP_OPCACHE_ENABLE:-true}"
+  validate_boolean RUN_OPTIMIZE_CLEAR_ON_BOOT "${RUN_OPTIMIZE_CLEAR_ON_BOOT}"
+  validate_boolean RUN_STORAGE_LINK_ON_BOOT "${RUN_STORAGE_LINK_ON_BOOT}"
+  validate_boolean RUN_MIGRATIONS_ON_BOOT "${RUN_MIGRATIONS_ON_BOOT}"
+  validate_boolean RUN_SEEDERS_ON_BOOT "${RUN_SEEDERS_ON_BOOT}"
+  validate_boolean RUN_QUEUE_RESTART_ON_BOOT "${RUN_QUEUE_RESTART_ON_BOOT}"
+
+  if [[ -n "${APP_UID}" ]]; then
+    validate_numeric APP_UID "${APP_UID}"
+  fi
+  if [[ -n "${APP_GID}" ]]; then
+    validate_numeric APP_GID "${APP_GID}"
+  fi
+  validate_numeric PHP_FPM_PM_MAX_CHILDREN "${PHP_FPM_PM_MAX_CHILDREN}"
+  validate_numeric PHP_FPM_PM_START_SERVERS "${PHP_FPM_PM_START_SERVERS}"
+  validate_numeric PHP_FPM_PM_MIN_SPARE_SERVERS "${PHP_FPM_PM_MIN_SPARE_SERVERS}"
+  validate_numeric PHP_FPM_PM_MAX_SPARE_SERVERS "${PHP_FPM_PM_MAX_SPARE_SERVERS}"
+  validate_numeric PHP_FPM_PM_MAX_REQUESTS "${PHP_FPM_PM_MAX_REQUESTS}"
+  validate_numeric QUEUE_SLEEP "${QUEUE_SLEEP}"
+  validate_numeric QUEUE_TRIES "${QUEUE_TRIES}"
+  validate_numeric QUEUE_TIMEOUT "${QUEUE_TIMEOUT}"
+  validate_numeric QUEUE_MAX_JOBS "${QUEUE_MAX_JOBS}"
+  validate_numeric QUEUE_MAX_TIME "${QUEUE_MAX_TIME}"
+  validate_numeric QUEUE_BACKOFF "${QUEUE_BACKOFF}"
 }
 
 require_file() {
@@ -85,6 +159,11 @@ configure_runtime_user() {
       usermod -u "${target_uid}" www-data
     fi
   fi
+}
+
+configure_timezone() {
+  ln -sf "/usr/share/zoneinfo/${TZ}" /etc/localtime
+  printf '%s\n' "${TZ}" > /etc/timezone
 }
 
 prepare_permissions() {
@@ -231,6 +310,7 @@ validate_app() {
 configure_php() {
   cat > /usr/local/etc/php/conf.d/zz-runtime.ini <<EOF
 memory_limit=${PHP_MEMORY_LIMIT:-512M}
+date.timezone=${TZ}
 opcache.enable=$([[ "${PHP_OPCACHE_ENABLE:-true}" == "true" ]] && echo 1 || echo 0)
 opcache.enable_cli=$([[ "${PHP_OPCACHE_ENABLE:-true}" == "true" ]] && echo 1 || echo 0)
 opcache.validate_timestamps=$([[ "${PHP_OPCACHE_ENABLE:-true}" == "true" ]] && echo 0 || echo 1)
@@ -248,7 +328,9 @@ prepare_runtime_directories() {
 }
 
 main() {
+  validate_configuration
   configure_runtime_user
+  configure_timezone
   validate_app
   prepare_permissions
   run_boot_hooks

@@ -119,7 +119,12 @@ COPY docker/bin/healthcheck.sh /usr/local/bin/healthcheck.sh
 COPY docker/bin/run-queue.sh /usr/local/bin/run-queue.sh
 COPY docker/bin/run-scheduler.sh /usr/local/bin/run-scheduler.sh
 
-RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/healthcheck.sh /usr/local/bin/run-queue.sh /usr/local/bin/run-scheduler.sh \
+RUN sed -i 's/\r$//' \
+        /usr/local/bin/entrypoint.sh \
+        /usr/local/bin/healthcheck.sh \
+        /usr/local/bin/run-queue.sh \
+        /usr/local/bin/run-scheduler.sh \
+    && chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/healthcheck.sh /usr/local/bin/run-queue.sh /usr/local/bin/run-scheduler.sh \
     && php -m | grep -qi '^imagick$' \
     && php -m | grep -qi '^redis$' \
     && php -m | grep -qi '^gd$' \
