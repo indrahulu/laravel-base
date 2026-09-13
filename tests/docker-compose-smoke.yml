@@ -6,12 +6,6 @@ services:
       - "${WEB_HTTPS_PORT:-18443}:8443"
     environment:
       APP_ROLE: web
-      APP_HEALTHCHECK_PATH: /up
-      RUN_OPTIMIZE_CLEAR_ON_BOOT: ${RUN_OPTIMIZE_CLEAR_ON_BOOT:-false}
-      RUN_STORAGE_LINK_ON_BOOT: ${RUN_STORAGE_LINK_ON_BOOT:-false}
-      RUN_MIGRATIONS_ON_BOOT: ${RUN_MIGRATIONS_ON_BOOT:-false}
-      RUN_SEEDERS_ON_BOOT: ${RUN_SEEDERS_ON_BOOT:-false}
-      RUN_QUEUE_RESTART_ON_BOOT: ${RUN_QUEUE_RESTART_ON_BOOT:-false}
     volumes:
       - ./fixture-app:/var/www/html
     restart: "no"
@@ -20,12 +14,6 @@ services:
     image: ${IMAGE:?IMAGE is required, e.g. IMAGE=indrahulu/laravel-base:php8.3}
     environment:
       APP_ROLE: worker
-      APP_HEALTHCHECK_PATH: /up
-      RUN_OPTIMIZE_CLEAR_ON_BOOT: ${RUN_OPTIMIZE_CLEAR_ON_BOOT:-false}
-      RUN_STORAGE_LINK_ON_BOOT: ${RUN_STORAGE_LINK_ON_BOOT:-false}
-      RUN_MIGRATIONS_ON_BOOT: ${RUN_MIGRATIONS_ON_BOOT:-false}
-      RUN_SEEDERS_ON_BOOT: ${RUN_SEEDERS_ON_BOOT:-false}
-      RUN_QUEUE_RESTART_ON_BOOT: ${RUN_QUEUE_RESTART_ON_BOOT:-false}
       QUEUE_CONNECTION: redis
       QUEUE_NAMES: default
     depends_on:
@@ -39,12 +27,6 @@ services:
     image: ${IMAGE:?IMAGE is required, e.g. IMAGE=indrahulu/laravel-base:php8.3}
     environment:
       APP_ROLE: scheduler
-      APP_HEALTHCHECK_PATH: /up
-      RUN_OPTIMIZE_CLEAR_ON_BOOT: ${RUN_OPTIMIZE_CLEAR_ON_BOOT:-false}
-      RUN_STORAGE_LINK_ON_BOOT: ${RUN_STORAGE_LINK_ON_BOOT:-false}
-      RUN_MIGRATIONS_ON_BOOT: ${RUN_MIGRATIONS_ON_BOOT:-false}
-      RUN_SEEDERS_ON_BOOT: ${RUN_SEEDERS_ON_BOOT:-false}
-      RUN_QUEUE_RESTART_ON_BOOT: ${RUN_QUEUE_RESTART_ON_BOOT:-false}
     volumes:
       - ./fixture-app:/var/www/html
     restart: "no"
@@ -56,12 +38,6 @@ services:
       - "${ALL_HTTPS_PORT:-28443}:8443"
     environment:
       APP_ROLE: all
-      APP_HEALTHCHECK_PATH: /up
-      RUN_OPTIMIZE_CLEAR_ON_BOOT: ${RUN_OPTIMIZE_CLEAR_ON_BOOT:-false}
-      RUN_STORAGE_LINK_ON_BOOT: ${RUN_STORAGE_LINK_ON_BOOT:-false}
-      RUN_MIGRATIONS_ON_BOOT: ${RUN_MIGRATIONS_ON_BOOT:-false}
-      RUN_SEEDERS_ON_BOOT: ${RUN_SEEDERS_ON_BOOT:-false}
-      RUN_QUEUE_RESTART_ON_BOOT: ${RUN_QUEUE_RESTART_ON_BOOT:-false}
       QUEUE_CONNECTION: redis
       QUEUE_NAMES: default
     depends_on:
