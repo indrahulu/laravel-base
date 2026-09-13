@@ -19,7 +19,7 @@ run_compose() {
 
 cleanup() {
   log "dumping container logs for diagnostics"
-  for service in web web-upload-override worker scheduler all all-no-queue timezone redis; do
+  for service in web web-upload-override web-health-root web-health-failing all-health-failing worker scheduler all all-no-queue timezone redis; do
     log "--- logs: ${service} ---"
     run_compose logs --tail=50 "${service}" 2>&1 || true
   done
@@ -61,6 +61,24 @@ assert_healthy_or_running() {
   local health
   health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "${cid}")"
   [[ "${health}" == "healthy" || "${health}" == "none" ]]
+}
+
+assert_health_status() {
+  local service="$1"
+  local expected="$2"
+  local cid health
+
+  cid="$(run_compose ps -q "${service}")"
+  if [[ -z "${cid}" ]]; then
+    log "service ${service} has no container id"
+    return 1
+  fi
+
+  health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "${cid}")"
+  if [[ "${health}" != "${expected}" ]]; then
+    log "unexpected health status in ${service}: expected=${expected} actual=${health}"
+    return 1
+  fi
 }
 
 assert_process_running() {
@@ -213,10 +231,15 @@ main() {
   log "starting smoke stack"
   run_compose up -d
 
-  for service in web web-upload-override worker scheduler all all-no-queue; do
+  for service in web web-upload-override web-health-root worker scheduler all all-no-queue; do
     wait_for "${service} running" "assert_running ${service}"
     wait_for "${service} healthy" "assert_healthy_or_running ${service}"
   done
+
+  wait_for "web-health-failing running" "assert_running web-health-failing"
+  wait_for "web-health-failing unhealthy" "assert_health_status web-health-failing unhealthy"
+  wait_for "all-health-failing running" "assert_running all-health-failing"
+  wait_for "all-health-failing unhealthy" "assert_health_status all-health-failing unhealthy"
 
   if [[ -n "${EXPECTED_PHP_VERSION:-}" ]]; then
     log "checking PHP version (expected: ${EXPECTED_PHP_VERSION})"
@@ -244,6 +267,9 @@ main() {
   assert_startup_rejected "invalid PHP-FPM value" "PHP_FPM_PM_MAX_CHILDREN must be numeric" -e PHP_FPM_PM_MAX_CHILDREN=invalid
   assert_startup_rejected "invalid queue value" "QUEUE_SLEEP must be numeric" -e QUEUE_SLEEP=invalid
   assert_startup_rejected "invalid timezone" "TZ must be a valid IANA timezone" -e TZ=Mars/Olympus
+
+  log "checking strict health paths"
+  wait_for "explicit root health path" "assert_health_status web-health-root healthy"
 
   log "checking upload limits"
   for service in web all; do

@@ -11,6 +11,13 @@ if ($path === '/up') {
     return;
 }
 
+if ($path === '/health-fail') {
+    http_response_code(503);
+    header('Content-Type: text/plain');
+    echo "Unavailable\n";
+    return;
+}
+
 http_response_code(200);
 header('Content-Type: text/plain');
 echo "Fixture Laravel-like app\n";

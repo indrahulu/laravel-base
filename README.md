@@ -268,6 +268,8 @@ environment:
 
 Entrypoint memvalidasi role, boolean flag, path absolut, UID/GID numerik, nilai PHP-FPM numerik, serta opsi queue numerik sebelum service dimulai. `TZ` harus berupa IANA timezone yang tersedia di image.
 
+Health check selalu memeriksa `APP_HEALTHCHECK_PATH` secara strict; default-nya `/up`. Aplikasi lama yang hanya menyediakan endpoint `/` harus mengatur `APP_HEALTHCHECK_PATH=/` secara eksplisit.
+
 **PHP**
 
 | Variable | Default | Deskripsi |
