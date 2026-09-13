@@ -19,7 +19,7 @@ run_compose() {
 
 cleanup() {
   log "dumping container logs for diagnostics"
-  for service in web worker scheduler all all-no-queue timezone redis; do
+  for service in web web-upload-override worker scheduler all all-no-queue timezone redis; do
     log "--- logs: ${service} ---"
     run_compose logs --tail=50 "${service}" 2>&1 || true
   done
@@ -129,6 +129,44 @@ assert_timezone() {
   [[ "${php_timezone}" == "${expected}" && "${os_timezone}" == "${expected}" ]]
 }
 
+assert_php_upload_limits() {
+  local service="$1"
+  local expected_upload="$2"
+  local expected_post="$3"
+  local cid actual_upload actual_post
+
+  cid="$(run_compose ps -q "${service}")"
+  if [[ -z "${cid}" ]]; then
+    log "service ${service} has no container id"
+    return 1
+  fi
+
+  read -r actual_upload actual_post < <(
+    docker exec "${cid}" php -r 'echo ini_get("upload_max_filesize")." ".ini_get("post_max_size");'
+  )
+  if [[ "${actual_upload}" != "${expected_upload}" || "${actual_post}" != "${expected_post}" ]]; then
+    log "unexpected PHP upload limits in ${service}: expected=${expected_upload}/${expected_post} actual=${actual_upload}/${actual_post}"
+    return 1
+  fi
+}
+
+assert_nginx_body_limit() {
+  local service="$1"
+  local expected="$2"
+  local cid
+
+  cid="$(run_compose ps -q "${service}")"
+  if [[ -z "${cid}" ]]; then
+    log "service ${service} has no container id"
+    return 1
+  fi
+
+  if ! docker exec "${cid}" grep -Fq "client_max_body_size ${expected};" /etc/nginx/conf.d/default.conf; then
+    log "unexpected Nginx body limit in ${service}: expected=${expected}"
+    return 1
+  fi
+}
+
 assert_startup_rejected() {
   local description="$1"
   local expected_message="$2"
@@ -175,7 +213,7 @@ main() {
   log "starting smoke stack"
   run_compose up -d
 
-  for service in web worker scheduler all all-no-queue; do
+  for service in web web-upload-override worker scheduler all all-no-queue; do
     wait_for "${service} running" "assert_running ${service}"
     wait_for "${service} healthy" "assert_healthy_or_running ${service}"
   done
@@ -206,6 +244,13 @@ main() {
   assert_startup_rejected "invalid PHP-FPM value" "PHP_FPM_PM_MAX_CHILDREN must be numeric" -e PHP_FPM_PM_MAX_CHILDREN=invalid
   assert_startup_rejected "invalid queue value" "QUEUE_SLEEP must be numeric" -e QUEUE_SLEEP=invalid
   assert_startup_rejected "invalid timezone" "TZ must be a valid IANA timezone" -e TZ=Mars/Olympus
+
+  log "checking upload limits"
+  for service in web all; do
+    wait_for "${service} PHP upload limits" "assert_php_upload_limits ${service} 500G 501G"
+    wait_for "${service} Nginx default body limit" "assert_nginx_body_limit ${service} 5m"
+  done
+  wait_for "Nginx body limit override" "assert_nginx_body_limit web-upload-override 500g"
 
   log "checking worker queue process"
   wait_for "worker process" "assert_process_running worker 'queue:work'"

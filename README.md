@@ -275,6 +275,8 @@ Entrypoint memvalidasi role, boolean flag, path absolut, UID/GID numerik, nilai 
 | `PHP_MEMORY_LIMIT` | `512M` | PHP memory limit |
 | `PHP_OPCACHE_ENABLE` | `true` | Aktifkan opcache |
 
+PHP menetapkan ceiling `upload_max_filesize=500G` dan `post_max_size=501G`. Keduanya bukan environment variable; limit operasional ditentukan oleh Nginx.
+
 **PHP-FPM**
 
 | Variable | Default | Deskripsi |
@@ -289,8 +291,10 @@ Entrypoint memvalidasi role, boolean flag, path absolut, UID/GID numerik, nilai 
 
 | Variable | Default | Deskripsi |
 |----------|---------|----------|
-| `NGINX_CLIENT_MAX_BODY_SIZE` | `64m` | Max upload size |
+| `NGINX_CLIENT_MAX_BODY_SIZE` | `5m` | Limit body request Nginx; dapat dinaikkan hingga ceiling PHP |
 | `SSL_SELF_SIGNED_ENABLE` | `true` | Aktifkan HTTPS dengan self-signed cert |
+
+Default upload efektif adalah `5 MB` dari Nginx. Untuk upload lebih besar, override `NGINX_CLIENT_MAX_BODY_SIZE` secara eksplisit, maksimal hingga ceiling PHP `500G`/`501G`. Upload besar tetap bergantung pada reverse proxy, timeout, temporary disk, dan storage aplikasi.
 
 **Queue**
 

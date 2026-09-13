@@ -10,6 +10,16 @@ services:
       - ./fixture-app:/var/www/html
     restart: "no"
 
+  web-upload-override:
+    image: ${IMAGE:?IMAGE is required, e.g. IMAGE=indrahulu/laravel-base:php8.3}
+    environment:
+      APP_ROLE: web
+      NGINX_CLIENT_MAX_BODY_SIZE: 500g
+    ports: []
+    volumes:
+      - ./fixture-app:/var/www/html
+    restart: "no"
+
   timezone:
     profiles: [checks]
     image: ${IMAGE:?IMAGE is required, e.g. IMAGE=indrahulu/laravel-base:php8.3}
