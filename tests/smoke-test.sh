@@ -19,7 +19,7 @@ run_compose() {
 
 cleanup() {
   log "dumping container logs for diagnostics"
-  for service in web worker scheduler all timezone redis; do
+  for service in web worker scheduler all all-no-queue timezone redis; do
     log "--- logs: ${service} ---"
     run_compose logs --tail=50 "${service}" 2>&1 || true
   done
@@ -75,6 +75,24 @@ assert_process_running() {
   fi
 
   docker exec "${cid}" pgrep -f "${process_pattern}" >/dev/null 2>&1
+}
+
+assert_queue_worker_count() {
+  local service="$1"
+  local expected="$2"
+  local cid count
+
+  cid="$(run_compose ps -q "${service}")"
+  if [[ -z "${cid}" ]]; then
+    log "service ${service} has no container id"
+    return 1
+  fi
+
+  count="$(docker exec "${cid}" sh -c "pgrep -af 'php.*artisan [q]ueue:work' | wc -l")"
+  if [[ "${count}" -ne "${expected}" ]]; then
+    log "unexpected queue worker count in ${service}: expected=${expected} actual=${count}"
+    return 1
+  fi
 }
 
 assert_php_version() {
@@ -157,7 +175,7 @@ main() {
   log "starting smoke stack"
   run_compose up -d
 
-  for service in web worker scheduler all; do
+  for service in web worker scheduler all all-no-queue; do
     wait_for "${service} running" "assert_running ${service}"
     wait_for "${service} healthy" "assert_healthy_or_running ${service}"
   done
@@ -191,6 +209,9 @@ main() {
 
   log "checking worker queue process"
   wait_for "worker process" "assert_process_running worker 'queue:work'"
+  wait_for "worker has one queue process" "assert_queue_worker_count worker 1"
+  wait_for "all has one queue process" "assert_queue_worker_count all 1"
+  wait_for "all without queue process" "assert_queue_worker_count all-no-queue 0"
 
   log "checking scheduler process"
   wait_for "scheduler process" "assert_process_running scheduler 'schedule:work'"

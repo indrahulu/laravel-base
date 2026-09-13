@@ -30,7 +30,6 @@ ENV APP_ROOT=/var/www/html \
     QUEUE_MAX_JOBS=0 \
     QUEUE_MAX_TIME=0 \
     QUEUE_BACKOFF=0 \
-    QUEUE_CONCURRENCY=1 \
     APP_HEALTHCHECK_PATH=/up \
     TZ=Asia/Jakarta
 

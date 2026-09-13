@@ -26,6 +26,7 @@ services:
       APP_ROLE: worker
       QUEUE_CONNECTION: redis
       QUEUE_NAMES: default
+      QUEUE_CONCURRENCY: "3"
     depends_on:
       redis:
         condition: service_started
@@ -50,9 +51,20 @@ services:
       APP_ROLE: all
       QUEUE_CONNECTION: redis
       QUEUE_NAMES: default
+      QUEUE_CONCURRENCY: "3"
     depends_on:
       redis:
         condition: service_started
+    volumes:
+      - ./fixture-app:/var/www/html
+    restart: "no"
+
+  all-no-queue:
+    image: ${IMAGE:?IMAGE is required, e.g. IMAGE=indrahulu/laravel-base:php8.3}
+    environment:
+      APP_ROLE: all
+      QUEUE_ENABLED: "false"
+    ports: []
     volumes:
       - ./fixture-app:/var/www/html
     restart: "no"

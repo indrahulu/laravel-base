@@ -23,7 +23,7 @@ case "${APP_ROLE}" in
     supervisor_ok && process_running php-fpm && process_running nginx && http_ok
     ;;
   worker)
-    supervisor_ok && process_running queue-worker:queue-worker_00
+    supervisor_ok && process_running queue-worker
     ;;
   scheduler)
     supervisor_ok && process_running scheduler
@@ -34,7 +34,7 @@ case "${APP_ROLE}" in
       && process_running nginx \
       && process_running scheduler \
       && http_ok \
-      && { process_running queue-worker:queue-worker_00 || [[ "${QUEUE_ENABLED:-true}" != "true" ]]; }
+      && { process_running queue-worker || [[ "${QUEUE_ENABLED:-true}" != "true" ]]; }
     ;;
   *)
     exit 1

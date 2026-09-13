@@ -266,8 +266,7 @@ write_supervisor_programs() {
         log "QUEUE_ENABLED=false is incompatible with APP_ROLE=worker"
         exit 1
       fi
-      envsubst '${QUEUE_CONCURRENCY}' \
-        < /etc/supervisor/templates/queue-worker.conf.template \
+      cat /etc/supervisor/templates/queue-worker.conf.template \
         >> "${runtime_conf}"
       ;;
     scheduler)
@@ -279,8 +278,7 @@ write_supervisor_programs() {
       cat /etc/supervisor/templates/nginx.conf >> "${runtime_conf}"
       if [[ "${QUEUE_ENABLED}" == "true" ]]; then
         printf '\n' >> "${runtime_conf}"
-        envsubst '${QUEUE_CONCURRENCY}' \
-          < /etc/supervisor/templates/queue-worker.conf.template \
+        cat /etc/supervisor/templates/queue-worker.conf.template \
           >> "${runtime_conf}"
       fi
       printf '\n' >> "${runtime_conf}"

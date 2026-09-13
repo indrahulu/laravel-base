@@ -100,6 +100,10 @@ Diatur via environment variable `APP_ROLE`:
 | `scheduler` | `php artisan schedule:work` |
 | `all` | Semua proses via `supervisor` |
 
+Queue role `worker` menjalankan tepat satu proses `queue:work` per container. Untuk meningkatkan throughput, jalankan beberapa replica container `worker`; `QUEUE_CONCURRENCY` tidak lagi digunakan dan nilai lama akan diabaikan. Role `all` juga menjalankan tepat satu queue worker saat `QUEUE_ENABLED=true`.
+
+Role `scheduler` sebaiknya dijalankan sebagai satu replica per deployment. Jika membutuhkan lebih dari satu replica, aplikasi harus memakai distributed lock Laravel seperti `onOneServer` agar jadwal tidak berjalan ganda.
+
 ### Bind Mount
 
 Pola ini cocok untuk development atau staging. Source code di-mount langsung dari host ke container.
@@ -295,7 +299,6 @@ Entrypoint memvalidasi role, boolean flag, path absolut, UID/GID numerik, nilai 
 | `QUEUE_ENABLED` | `true` | Aktifkan queue worker |
 | `QUEUE_CONNECTION` | `database` | Laravel queue connection |
 | `QUEUE_NAMES` | `default` | Queue names (comma-separated) |
-| `QUEUE_CONCURRENCY` | `1` | Jumlah concurrent queue workers |
 | `QUEUE_SLEEP` | `3` | Detik tidur jika tidak ada job |
 | `QUEUE_TRIES` | `3` | Max retry per job |
 | `QUEUE_TIMEOUT` | `90` | Detik timeout per job |

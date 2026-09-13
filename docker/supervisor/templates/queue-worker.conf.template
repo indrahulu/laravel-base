@@ -1,7 +1,5 @@
 [program:queue-worker]
-process_name=%(program_name)s_%(process_num)02d
 command=/usr/local/bin/run-queue.sh
-numprocs=${QUEUE_CONCURRENCY}
 autostart=true
 autorestart=true
 startsecs=3
