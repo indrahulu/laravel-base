@@ -42,6 +42,22 @@ docker pull indrahulu/laravel-base:php8.4-v1.0.0
 docker pull indrahulu/laravel-base:php8.4-nightly
 ```
 
+## Lifecycle Rilis
+
+Workflow CI menjalankan build dan smoke test untuk PHP 8.2, 8.3, 8.4, dan 8.5 sebelum image dipublikasikan. Jalur publikasi ditentukan oleh pemicu berikut:
+
+| Pemicu | Build dan smoke test | Tag yang di-push |
+|--------|----------------------|------------------|
+| Pull request ke `master` | Ya | Tidak ada |
+| Push ke `master` | Ya | Tidak ada |
+| `workflow_dispatch` | Ya | `php<versi>` (latest per versi) |
+| Jadwal harian | Ya | `php<versi>-nightly` |
+| Push tag `v*` | Ya | `php<versi>-v<versi>` (versioned) dan `php<versi>` (latest), lalu cleanup tag lama |
+
+Release dilakukan dengan membuat tag Git seperti `v1.1.0`. Tag versioned digunakan untuk deployment yang immutable, sedangkan tag `php<versi>` mengikuti release terbaru. Gunakan tag `-nightly` hanya untuk validasi build harian, bukan deployment produksi. Perubahan README saja tidak memicu workflow karena CI mengabaikan path tersebut.
+
+`workflow_dispatch` berguna untuk mem-push ulang tag latest secara manual setelah build dan smoke test lulus. Pull request dan push branch hanya memvalidasi perubahan; keduanya tidak mengubah Docker Hub.
+
 ## Build
 
 Versi PHP ditentukan secara eksplisit via `--build-arg`. Build tanpa menentukan versi akan gagal.
@@ -55,11 +71,13 @@ docker build --build-arg PHP_VERSION=8.2 -t indrahulu/laravel-base:php8.2 .
 
 ## Smoke Test
 
-Smoke test menjalankan 4 container (satu per role) dan memverifikasi:
+Smoke test menjalankan stack Compose dengan container untuk setiap role dan cabang konfigurasi penting, lalu memverifikasi:
 
 - Container `running` dan `healthy`
+- Strict health path untuk role `web` dan `all`
 - PHP version sesuai ekspektasi
 - Process `queue:work` dan `schedule:work` aktif
+- Batas upload PHP dan Nginx
 - HTTP dan HTTPS endpoint merespons
 
 Container logs otomatis di-dump saat test selesai (sukses atau gagal).
@@ -321,3 +339,43 @@ Default upload efektif adalah `5 MB` dari Nginx. Untuk upload lebih besar, overr
 | `RUN_MIGRATIONS_ON_BOOT` | `false` | Jalankan `php artisan migrate --force` |
 | `RUN_SEEDERS_ON_BOOT` | `false` | Jalankan `php artisan db:seed --force` |
 | `RUN_QUEUE_RESTART_ON_BOOT` | `false` | Jalankan `php artisan queue:restart` |
+
+## Migration Notes
+
+Bagian ini diperlukan saat memindahkan aplikasi dari image atau konfigurasi lama.
+
+### Health check menjadi strict
+
+Health check hanya memeriksa endpoint pada `APP_HEALTHCHECK_PATH`; fallback otomatis ke `/` sudah dihapus. Aplikasi lama yang hanya memiliki route `/` harus menetapkan konfigurasi berikut pada setiap service yang menjalankan role `web` atau `all`:
+
+```yaml
+environment:
+  APP_HEALTHCHECK_PATH: /
+```
+
+Jika path yang dipilih mengembalikan status HTTP non-2xx atau tidak dapat diakses, container menjadi `unhealthy`.
+
+### Queue tidak lagi memakai internal concurrency
+
+`QUEUE_CONCURRENCY` sudah dihapus dari kontrak image dan tidak lagi membuat beberapa proses `queue:work` dalam satu container. Hapus variable tersebut dari deployment lama. Untuk menaikkan throughput, scale replica role `worker`, misalnya:
+
+```bash
+docker compose up -d --scale worker=3 worker
+```
+
+Setiap replica menjalankan tepat satu worker. Jalankan scheduler sebagai satu replica; bila harus menjalankan lebih dari satu, aplikasi wajib memakai distributed lock Laravel seperti `onOneServer` agar jadwal tidak diproses ganda.
+
+### Default upload turun menjadi 5 MB
+
+Default operasional Nginx sekarang `NGINX_CLIENT_MAX_BODY_SIZE=5m`, sehingga request upload yang tidak dikonfigurasi ulang dibatasi sekitar 5 MB. PHP menyediakan ceiling `upload_max_filesize=500G` dan `post_max_size=501G`, tetapi limit efektif juga bergantung pada reverse proxy, timeout, temporary disk, dan storage aplikasi.
+
+Untuk aplikasi yang memang membutuhkan upload lebih besar, override limit Nginx secara eksplisit dan pastikan seluruh proxy di depannya memakai limit yang sama:
+
+```yaml
+environment:
+  NGINX_CLIENT_MAX_BODY_SIZE: 100m
+```
+
+### Timezone runtime
+
+Default timezone adalah `Asia/Jakarta`. `TZ` dapat diubah ke nama timezone IANA yang tersedia di image; entrypoint menerapkannya saat container start. Pastikan nilai `TZ` konsisten pada seluruh role aplikasi.
