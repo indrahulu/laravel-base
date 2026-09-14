@@ -1,15 +1,15 @@
 services:
   app:
-    image: indrahulu/laravel-base:php8.5
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: laravel-app:local
     env_file:
       - .env
     ports:
       - "8080:8080"
       - "8443:8443"
     environment:
-      APP_UID: "${APP_UID:-1000}"
-      APP_GID: "${APP_GID:-1000}"
-      APP_HEALTHCHECK_PATH: "${APP_HEALTHCHECK_PATH:-}"
       APP_ROLE: all
       RUN_MIGRATIONS_ON_BOOT: "true"
       TZ: "${TZ:-Asia/Jakarta}"
@@ -17,7 +17,7 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - "${LARAVEL_APP_PATH:-.}:/var/www/html"
+      - storage:/var/www/html/storage
     restart: unless-stopped
 
   db:
@@ -37,3 +37,4 @@ services:
 
 volumes:
   db:
+  storage:
