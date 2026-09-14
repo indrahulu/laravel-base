@@ -15,7 +15,6 @@ services:
       APP_UID: "${APP_UID:-1000}"
       APP_GID: "${APP_GID:-1000}"
       RUN_MIGRATIONS_ON_BOOT: "true"
-      QUEUE_ENABLED: "true"
       # Kosongkan jika aplikasi tidak memiliki endpoint health HTTP khusus.
       APP_HEALTHCHECK_PATH: "${APP_HEALTHCHECK_PATH:-}"
       TZ: "${TZ:-Asia/Jakarta}"
