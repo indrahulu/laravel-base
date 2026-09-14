@@ -25,7 +25,7 @@ cleanup() {
   done
 
   log "tearing down stack"
-  run_compose down -v --remove-orphans >/dev/null 2>&1 || true
+  run_compose --profile checks down -v --remove-orphans >/dev/null 2>&1 || true
 }
 
 assert_http() {
