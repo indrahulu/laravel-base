@@ -1,0 +1,20 @@
+# Contoh generik untuk repo Laravel.
+# Salin file ini ke root repo aplikasi sebelum menjalankan `docker compose up -d`.
+# Untuk deployment yang immutable, gunakan tag versioned, misalnya php8.5-v2.0.0.
+
+services:
+  web:
+    image: indrahulu/laravel-base:php8.5
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    environment:
+      APP_ROLE: web
+      APP_UID: "${APP_UID:-1000}"
+      APP_GID: "${APP_GID:-1000}"
+      # Kosongkan jika aplikasi tidak memiliki endpoint health HTTP khusus.
+      APP_HEALTHCHECK_PATH: "${APP_HEALTHCHECK_PATH:-}"
+      TZ: "${TZ:-Asia/Jakarta}"
+    volumes:
+      - "${LARAVEL_APP_PATH:-.}:/var/www/html"
+    restart: unless-stopped
