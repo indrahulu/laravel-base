@@ -1,17 +1,21 @@
-# Contoh generik untuk repo Laravel.
+# Contoh development/single-container untuk repo Laravel.
 # Salin file ini ke root repo aplikasi sebelum menjalankan `docker compose up -d`.
 # Untuk deployment yang immutable, gunakan tag versioned, misalnya php8.5-v2.0.0.
+# RUN_MIGRATIONS_ON_BOOT cocok untuk satu instance local; gunakan migration job
+# terpisah sebelum startup untuk production atau deployment multi-replica.
 
 services:
-  web:
+  app:
     image: indrahulu/laravel-base:php8.5
     ports:
       - "8080:8080"
       - "8443:8443"
     environment:
-      APP_ROLE: web
+      APP_ROLE: all
       APP_UID: "${APP_UID:-1000}"
       APP_GID: "${APP_GID:-1000}"
+      RUN_MIGRATIONS_ON_BOOT: "true"
+      QUEUE_ENABLED: "true"
       # Kosongkan jika aplikasi tidak memiliki endpoint health HTTP khusus.
       APP_HEALTHCHECK_PATH: "${APP_HEALTHCHECK_PATH:-}"
       TZ: "${TZ:-Asia/Jakarta}"
