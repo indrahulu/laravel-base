@@ -56,6 +56,7 @@ RUN apt-get update \
         supervisor \
         tzdata \
         unzip \
+        wget \
     && ln -sf /usr/share/zoneinfo/${TZ} /etc/localtime \
     && echo "${TZ}" > /etc/timezone \
     && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
@@ -87,6 +88,7 @@ RUN apt-get update \
         libwebp-dev \
         libxml2-dev \
         libzip-dev \
+        wget \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
