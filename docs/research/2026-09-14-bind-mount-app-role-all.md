@@ -25,7 +25,7 @@ Bisa. Bind mount hanya menentukan dari mana source code Laravel dibaca; bind mou
    - `public/index.php`
    - `artisan`
    - dependency Laravel, terutama `vendor/autoload.php`
-2. `QUEUE_ENABLED=true` adalah default image. Karena default `QUEUE_CONNECTION=database`, aplikasi harus memiliki konfigurasi database dan queue yang siap jika queue worker diaktifkan.
+2. `QUEUE_ENABLED=true` adalah default image. Karena default `QUEUE_CONNECTION=database`, aplikasi harus memiliki konfigurasi database dan queue yang siap jika queue worker diaktifkan. Jika tabel `jobs` belum ada, Laravel dapat melaporkan exception saat polling queue dan tetap membiarkan worker hidup; status container belum tentu berubah menjadi `unhealthy` karena healthcheck memeriksa proses, bukan kesiapan schema.
 3. Jika hanya membutuhkan web dan scheduler tanpa queue, gunakan `QUEUE_ENABLED=false`.
 4. `APP_HEALTHCHECK_PATH` tetap opsional. Jika diisi, endpoint tersebut harus merespons sukses; jika kosong, healthcheck hanya memeriksa proses internal.
 5. `APP_UID` dan `APP_GID` dapat disamakan dengan user host agar `storage` dan `bootstrap/cache` pada bind mount tidak bermasalah permission-nya.
@@ -60,4 +60,6 @@ Jika semuanya memakai `APP_ROLE=all`, scaling web juga menggandakan scheduler da
 1. Docker Docs, **Bind mounts** — menjelaskan bahwa bind mount memasukkan file/directory host ke container dan cocok untuk berbagi source code development: <https://docs.docker.com/engine/storage/bind-mounts/>
 2. Laravel Docs, **Running the Queue Worker** — dokumentasi resmi perintah `php artisan queue:work`: <https://laravel.com/docs/12.x/queues#running-the-queue-worker>
 3. Laravel Docs, **Running the Scheduler Locally** — dokumentasi resmi perintah `php artisan schedule:work`: <https://laravel.com/docs/12.x/scheduling#running-the-scheduler-locally>
-4. Repository source, `docker/bin/entrypoint.sh`, `Dockerfile`, `README.md`, dan `tests/docker-compose-smoke.yml`.
+4. Laravel application skeleton, default `.env.example` (SQLite, database session/cache/queue): <https://github.com/laravel/laravel/blob/12.x/.env.example>
+5. Laravel framework source, `Worker::getNextJob()` yang melaporkan exception polling queue lalu tidur kembali: <https://github.com/laravel/framework/blob/12.x/src/Illuminate/Queue/Worker.php>
+6. Repository source, `docker/bin/entrypoint.sh`, `Dockerfile`, `README.md`, dan `tests/docker-compose-smoke.yml`.
