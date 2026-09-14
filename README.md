@@ -3,7 +3,7 @@
 Base image Laravel production-ready berbasis `php-fpm-bookworm` dengan:
 
 - `nginx`, `php-fpm`, `supervisor`, `composer`
-- Extensions: `opcache`, `gd`, `imagick`, `sockets`, `redis`
+- Extensions: `bcmath`, `curl`, `exif`, `gd`, `imagick`, `intl`, `mysqli`, `opcache`, `pcntl`, `pdo_mysql`, `pdo_pgsql`, `pgsql`, `redis`, `sockets`, `zip`
 - 4 runtime roles: `web`, `worker`, `scheduler`, `all`
 - Self-signed SSL certificate (sudah di-generate di `docker/ssl/`)
 - Dukungan multi versi PHP: `8.2`, `8.3`, `8.4`, `8.5`
@@ -54,7 +54,7 @@ Workflow CI menjalankan build dan smoke test untuk PHP 8.2, 8.3, 8.4, dan 8.5 se
 | Jadwal harian | Ya | `php<versi>-nightly` |
 | Push tag `v*` | Ya | `php<versi>-v<versi>` (versioned) dan `php<versi>` (latest), lalu cleanup tag lama |
 
-Release dilakukan dengan membuat tag Git seperti `v1.1.0`. Tag versioned digunakan untuk deployment yang immutable, sedangkan tag `php<versi>` mengikuti release terbaru. Gunakan tag `-nightly` hanya untuk validasi build harian, bukan deployment produksi. Perubahan README saja tidak memicu workflow karena CI mengabaikan path tersebut.
+Release dilakukan dengan membuat tag Git seperti `v1.1.0`. Tag versioned digunakan untuk deployment yang immutable, sedangkan tag `php<versi>` mengikuti release terbaru. Gunakan tag `-nightly` hanya untuk validasi build harian, bukan deployment produksi. Perubahan README saja tidak memicu build CI karena CI mengabaikan path tersebut. Workflow `Docker Hub Description` tetap berjalan untuk menyinkronkan README ke Docker Hub.
 
 `workflow_dispatch` berguna untuk mem-push ulang tag latest secara manual setelah build dan smoke test lulus. Pull request dan push branch hanya memvalidasi perubahan; keduanya tidak mengubah Docker Hub.
 
@@ -124,112 +124,66 @@ Role `scheduler` sebaiknya dijalankan sebagai satu replica per deployment. Jika 
 
 ### Bind Mount
 
-Pola ini cocok untuk development atau staging. Source code di-mount langsung dari host ke container.
+Pola ini cocok untuk development atau staging. Source code dan `.env` di-mount dari host ke container.
 
-**Single container (semua role):**
+Contoh lengkap tersedia di [`docs/example/bind-mount/docker-compose.yml`](docs/example/bind-mount/docker-compose.yml). Contoh tersebut menyediakan:
 
-```yaml
-services:
-  app:
-    image: indrahulu/laravel-base:php8.5
-    ports:
-      - "8080:8080"
-      - "8443:8443"
-    environment:
-      APP_ROLE: all
-      APP_UID: "1000"
-      APP_GID: "1000"
-    volumes:
-      - ./your-laravel-app:/var/www/html
+- `APP_ROLE=all`
+- PostgreSQL dengan named volume
+- migration otomatis saat startup
+- `env_file: .env`
+- bind mount source Laravel ke `/var/www/html`
+
+Salin Compose ke root repo Laravel, lalu jalankan:
+
+```bash
+cp docs/example/bind-mount/docker-compose.yml /path/to/your-laravel-app/docker-compose.yml
+cd /path/to/your-laravel-app
+docker compose up -d
 ```
 
-**Split roles (production-like):**
+`.env` aplikasi harus menyediakan minimal konfigurasi yang cocok dengan service `db`:
 
-```yaml
-services:
-  web:
-    image: indrahulu/laravel-base:php8.5
-    ports:
-      - "8080:8080"
-      - "8443:8443"
-    environment:
-      APP_ROLE: web
-    volumes:
-      - ./your-laravel-app:/var/www/html
-
-  worker:
-    image: indrahulu/laravel-base:php8.5
-    environment:
-      APP_ROLE: worker
-    volumes:
-      - ./your-laravel-app:/var/www/html
-
-  scheduler:
-    image: indrahulu/laravel-base:php8.5
-    environment:
-      APP_ROLE: scheduler
-    volumes:
-      - ./your-laravel-app:/var/www/html
+```env
+APP_KEY=base64:...
+DB_CONNECTION=pgsql
+DB_HOST=db
+DB_PORT=5432
+DB_DATABASE=laravel
+DB_USERNAME=laravel
+DB_PASSWORD=laravel
+POSTGRES_DB=laravel
+POSTGRES_USER=laravel
+POSTGRES_PASSWORD=laravel
 ```
+
+Untuk Linux, set `APP_UID` dan `APP_GID` sesuai user host jika permission bind mount bermasalah.
 
 ### Build Immutable Image
 
-Pola ini cocok untuk production. Source code di-COPY ke dalam image, menghasilkan image yang immutable dan reproducible.
+Pola ini cocok untuk production. Source code dan asset frontend di-build ke dalam image; saat runtime tidak ada bind mount source code.
 
-**Dockerfile aplikasi:**
+Contoh lengkap tersedia di:
 
-```dockerfile
-FROM indrahulu/laravel-base:php8.5
+- [`docs/example/immutable/Dockerfile`](docs/example/immutable/Dockerfile)
+- [`docs/example/immutable/docker-compose.yml`](docs/example/immutable/docker-compose.yml)
+- [`docs/example/immutable/.dockerignore`](docs/example/immutable/.dockerignore)
 
-COPY --chown=www-data:www-data . /var/www/html
+Dockerfile contoh menggunakan multi-stage build untuk:
 
-RUN composer install --no-dev --optimize-autoloader \
-    && php artisan config:cache \
-    && php artisan route:cache \
-    && php artisan view:cache
-```
+1. `npm ci` dan `npm run build` pada stage Node.js;
+2. menyalin source serta `public/build` ke image Laravel;
+3. menjalankan `composer install --no-dev`.
 
-Build:
+Salin ketiga file tersebut ke root repo Laravel, siapkan `.env`, lalu jalankan:
 
 ```bash
-docker build -t yourorg/your-laravel-app:v1 .
+docker compose up -d --build
 ```
 
-**Single container:**
+Image immutable tidak membawa `.env`. Compose menyuntikkan `.env` melalui `env_file`, sedangkan source code tetap berada di dalam image. Named volume `storage` digunakan untuk file runtime seperti upload.
 
-```yaml
-services:
-  app:
-    image: yourorg/your-laravel-app:v1
-    ports:
-      - "8080:8080"
-      - "8443:8443"
-    environment:
-      APP_ROLE: all
-```
-
-**Split roles:**
-
-```yaml
-services:
-  web:
-    image: yourorg/your-laravel-app:v1
-    ports:
-      - "8080:8080"
-      - "8443:8443"
-    environment:
-      APP_ROLE: web
-
-  worker:
-    image: yourorg/your-laravel-app:v1
-    environment:
-      APP_ROLE: worker
-
-  scheduler:
-    image: yourorg/your-laravel-app:v1
-    environment:
-      APP_ROLE: scheduler
-```
+`RUN_MIGRATIONS_ON_BOOT=true` pada contoh ditujukan untuk single instance/local. Untuk deployment multi-replica, jalankan migration job terpisah sebelum service aplikasi.
 
 ### Override UID/GID
 
@@ -261,7 +215,7 @@ Boot hook dijalankan sebelum service utama start. Default-nya non-aktif dan hany
 | `RUN_SEEDERS_ON_BOOT=true` | `php artisan db:seed --force` |
 | `RUN_QUEUE_RESTART_ON_BOOT=true` | `php artisan queue:restart` |
 
-Urutan eksekusi sesuai tabel di atas. Jika command gagal, image mencetak warning dan tetap melanjutkan startup.
+Urutan eksekusi sesuai tabel di atas. Jika command gagal, image mencetak warning dan tetap melanjutkan startup. Karena itu `RUN_MIGRATIONS_ON_BOOT=true` cocok untuk development atau single instance; gunakan migration job terpisah untuk deployment multi-replica.
 
 ```yaml
 environment:
@@ -286,7 +240,7 @@ environment:
 
 Entrypoint memvalidasi role, boolean flag, path absolut, UID/GID numerik, nilai PHP-FPM numerik, serta opsi queue numerik sebelum service dimulai. `TZ` harus berupa IANA timezone yang tersedia di image.
 
-Docker healthcheck tetap memeriksa proses internal. Untuk role `web` dan `all`, HTTP application probe hanya dijalankan jika `APP_HEALTHCHECK_PATH` diisi; nilainya diperiksa secara strict tanpa fallback ke `/`. Jika kosong atau tidak diset, probe HTTP dilewati. Untuk menonaktifkan seluruh Docker healthcheck, override pada deployment dengan `healthcheck: disable: true`.
+Docker healthcheck tetap memeriksa proses internal. Role `web` memeriksa Supervisor, PHP-FPM, dan Nginx. Role `all` juga memeriksa scheduler serta queue worker ketika `QUEUE_ENABLED=true`. Untuk role `web` dan `all`, HTTP application probe hanya dijalankan jika `APP_HEALTHCHECK_PATH` diisi; nilainya diperiksa secara strict tanpa fallback ke `/`. Jika kosong atau tidak diset, probe HTTP dilewati. Untuk menonaktifkan seluruh Docker healthcheck, override pada deployment dengan `healthcheck: disable: true`.
 
 **PHP**
 
