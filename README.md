@@ -281,12 +281,12 @@ environment:
 | `APP_ROOT` | `/var/www/html` | Path ke Laravel application root |
 | `APP_UID` | *(kosong)* | Override UID `www-data` |
 | `APP_GID` | *(kosong)* | Override GID `www-data` |
-| `APP_HEALTHCHECK_PATH` | `/up` | Path endpoint healthcheck absolut |
+| `APP_HEALTHCHECK_PATH` | *(kosong)* | Optional absolute path untuk HTTP application health probe |
 | `TZ` | `Asia/Jakarta` | IANA timezone runtime; dapat di-override tanpa rebuild image |
 
 Entrypoint memvalidasi role, boolean flag, path absolut, UID/GID numerik, nilai PHP-FPM numerik, serta opsi queue numerik sebelum service dimulai. `TZ` harus berupa IANA timezone yang tersedia di image.
 
-Health check selalu memeriksa `APP_HEALTHCHECK_PATH` secara strict; default-nya `/up`. Aplikasi lama yang hanya menyediakan endpoint `/` harus mengatur `APP_HEALTHCHECK_PATH=/` secara eksplisit.
+Docker healthcheck tetap memeriksa proses internal. Untuk role `web` dan `all`, HTTP application probe hanya dijalankan jika `APP_HEALTHCHECK_PATH` diisi; nilainya diperiksa secara strict tanpa fallback ke `/`. Jika kosong atau tidak diset, probe HTTP dilewati. Untuk menonaktifkan seluruh Docker healthcheck, override pada deployment dengan `healthcheck: disable: true`.
 
 **PHP**
 
@@ -344,16 +344,30 @@ Default upload efektif adalah `5 MB` dari Nginx. Untuk upload lebih besar, overr
 
 Bagian ini diperlukan saat memindahkan aplikasi dari image atau konfigurasi lama.
 
-### Health check menjadi strict
+### Health check menjadi optional dan strict
 
-Health check hanya memeriksa endpoint pada `APP_HEALTHCHECK_PATH`; fallback otomatis ke `/` sudah dihapus. Aplikasi lama yang hanya memiliki route `/` harus menetapkan konfigurasi berikut pada setiap service yang menjalankan role `web` atau `all`:
+`APP_HEALTHCHECK_PATH` sekarang opsional. Jika tidak diset atau bernilai kosong, role `web` dan `all` tetap memeriksa Supervisor, PHP-FPM, dan Nginx, tetapi tidak melakukan HTTP application probe.
+
+Jika path diisi, hanya endpoint tersebut yang diperiksa; fallback otomatis ke `/` tidak ada. Aplikasi lama yang sebelumnya mengandalkan default `/up` harus menetapkannya secara eksplisit agar HTTP probe tetap aktif:
+
+```yaml
+environment:
+  APP_HEALTHCHECK_PATH: /up
+```
+
+Aplikasi yang hanya memiliki route `/` dapat menetapkan:
 
 ```yaml
 environment:
   APP_HEALTHCHECK_PATH: /
 ```
 
-Jika path yang dipilih mengembalikan status HTTP non-2xx atau tidak dapat diakses, container menjadi `unhealthy`.
+Jika path yang dipilih mengembalikan status HTTP non-2xx atau tidak dapat diakses, container menjadi `unhealthy`. Untuk menonaktifkan seluruh Docker healthcheck, bukan hanya HTTP probe, gunakan konfigurasi deployment berikut:
+
+```yaml
+healthcheck:
+  disable: true
+```
 
 ### Queue tidak lagi memakai internal concurrency
 

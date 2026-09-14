@@ -19,7 +19,7 @@ run_compose() {
 
 cleanup() {
   log "dumping container logs for diagnostics"
-  for service in web web-upload-override web-health-root web-health-failing all-health-failing worker scheduler all all-no-queue timezone redis; do
+  for service in web web-upload-override web-health-optional all-health-optional web-health-root web-health-failing all-health-failing worker scheduler all all-no-queue timezone redis; do
     log "--- logs: ${service} ---"
     run_compose logs --tail=50 "${service}" 2>&1 || true
   done
@@ -231,7 +231,7 @@ main() {
   log "starting smoke stack"
   run_compose up -d
 
-  for service in web web-upload-override web-health-root worker scheduler all all-no-queue; do
+  for service in web web-upload-override web-health-optional all-health-optional web-health-root worker scheduler all all-no-queue; do
     wait_for "${service} running" "assert_running ${service}"
     wait_for "${service} healthy" "assert_healthy_or_running ${service}"
   done
@@ -268,7 +268,9 @@ main() {
   assert_startup_rejected "invalid queue value" "QUEUE_SLEEP must be numeric" -e QUEUE_SLEEP=invalid
   assert_startup_rejected "invalid timezone" "TZ must be a valid IANA timezone" -e TZ=Mars/Olympus
 
-  log "checking strict health paths"
+  log "checking health paths"
+  wait_for "optional web HTTP health path" "assert_health_status web-health-optional healthy"
+  wait_for "optional all HTTP health path" "assert_health_status all-health-optional healthy"
   wait_for "explicit root health path" "assert_health_status web-health-root healthy"
 
   log "checking upload limits"

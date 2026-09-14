@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 APP_ROLE="${APP_ROLE:-web}"
-APP_HEALTHCHECK_PATH="${APP_HEALTHCHECK_PATH:-/up}"
+APP_HEALTHCHECK_PATH="${APP_HEALTHCHECK_PATH-}"
 
 supervisor_ok() {
   supervisorctl status >/dev/null 2>&1
@@ -17,9 +17,13 @@ http_ok() {
   curl --fail --silent --show-error "http://127.0.0.1:8080${APP_HEALTHCHECK_PATH}" >/dev/null
 }
 
+http_probe_ok() {
+  [[ -z "${APP_HEALTHCHECK_PATH}" ]] || http_ok
+}
+
 case "${APP_ROLE}" in
   web)
-    supervisor_ok && process_running php-fpm && process_running nginx && http_ok
+    supervisor_ok && process_running php-fpm && process_running nginx && http_probe_ok
     ;;
   worker)
     supervisor_ok && process_running queue-worker
@@ -32,7 +36,7 @@ case "${APP_ROLE}" in
       && process_running php-fpm \
       && process_running nginx \
       && process_running scheduler \
-      && http_ok \
+      && http_probe_ok \
       && { process_running queue-worker || [[ "${QUEUE_ENABLED:-true}" != "true" ]]; }
     ;;
   *)

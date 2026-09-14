@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 APP_ROOT="${APP_ROOT:-/var/www/html}"
 APP_ROLE="${APP_ROLE:-web}"
-APP_HEALTHCHECK_PATH="${APP_HEALTHCHECK_PATH:-/up}"
+APP_HEALTHCHECK_PATH="${APP_HEALTHCHECK_PATH-}"
 APP_UID="${APP_UID:-}"
 APP_GID="${APP_GID:-}"
 SSL_SELF_SIGNED_ENABLE="${SSL_SELF_SIGNED_ENABLE:-true}"
@@ -63,10 +63,10 @@ validate_configuration() {
     exit 1
   }
 
-  [[ "${APP_HEALTHCHECK_PATH}" == /* ]] || {
+  if [[ -n "${APP_HEALTHCHECK_PATH}" && "${APP_HEALTHCHECK_PATH}" != /* ]]; then
     log "APP_HEALTHCHECK_PATH must be an absolute path; got '${APP_HEALTHCHECK_PATH}'"
     exit 1
-  }
+  fi
 
   if [[ "${TZ}" == /* || "${TZ}" == *..* || ! -f "/usr/share/zoneinfo/${TZ}" ]]; then
     log "TZ must be a valid IANA timezone; got '${TZ}'"

@@ -1,4 +1,4 @@
-# Laporan Perubahan Image: `1cf96fc` → `ce38d9a`
+# Laporan Perubahan Image: `1cf96fc` → current
 
 Laporan ini hanya mencatat perubahan yang memengaruhi kontrak image atau keputusan pengguna. Hal yang tidak berubah—termasuk pola dasar bind mount/immutable build, role yang tersedia, versi PHP, extension, port, dan workflow CI—tidak dibahas sebagai perubahan.
 
@@ -8,7 +8,7 @@ Laporan ini hanya mencatat perubahan yang memengaruhi kontrak image atau keputus
 | --- | --- | --- | --- |
 | Validasi konfigurasi | Beberapa nilai malformed diteruskan atau diperlakukan sebagai `false` | Path, boolean, timezone, PHP-FPM, dan queue numeric divalidasi saat startup | Audit nilai nonstandar pada manifest |
 | Timezone | `TZ` custom belum diterapkan oleh entrypoint; PHP tetap Jakarta | `TZ` valid diterapkan ke OS dan PHP saat startup | Set `TZ` jika bukan `Asia/Jakarta` |
-| Health check | Endpoint gagal dapat fallback ke `/` | Hanya `APP_HEALTHCHECK_PATH` yang menentukan health | Set path eksplisit atau sediakan `/up` |
+| Health check | Endpoint gagal dapat fallback ke `/`; `/up` menjadi default | HTTP probe optional; jika diisi, path strict tanpa fallback | Set path jika ingin HTTP probe; kosong berarti process-only |
 | Queue | `QUEUE_CONCURRENCY` menentukan jumlah proses | Satu `queue:work` tetap per container | Hapus `QUEUE_CONCURRENCY`, scale replica |
 | Upload | PHP/Nginx sekitar 64 MB | PHP ceiling 500G/501G; Nginx default 5 MB | Override Nginx jika upload >5 MB |
 | Dokumentasi/test | Kontrak baru belum terdokumentasi dan belum diuji lengkap | README dan smoke test mencakup kontrak baru | Ikuti migration notes |
@@ -20,7 +20,7 @@ Laporan ini hanya mencatat perubahan yang memengaruhi kontrak image atau keputus
 Entrypoint sekarang memvalidasi beberapa nilai sebelum service dimulai:
 
 - `APP_ROOT` harus absolute path.
-- `APP_HEALTHCHECK_PATH` harus absolute path.
+- `APP_HEALTHCHECK_PATH`, jika diisi, harus absolute path; nilai kosong berarti HTTP probe dilewati.
 - `TZ` harus nama timezone IANA yang tersedia di image.
 - Flag boolean harus tepat `true` atau `false`: `SSL_SELF_SIGNED_ENABLE`, `QUEUE_ENABLED`, `PHP_OPCACHE_ENABLE`, dan seluruh flag `RUN_*_ON_BOOT`.
 - `PHP_FPM_PM_*` dan opsi queue seperti `QUEUE_SLEEP`, `QUEUE_TRIES`, `QUEUE_TIMEOUT`, `QUEUE_MAX_JOBS`, `QUEUE_MAX_TIME`, serta `QUEUE_BACKOFF` harus numeric.
@@ -68,34 +68,36 @@ environment:
   TZ: Asia/Singapore
 ```
 
-## 3. Health check strict
+## 3. Health check optional dan strict
 
 ### Perubahan
 
-`docker/bin/healthcheck.sh` tidak lagi melakukan fallback ke `/`.
+- `APP_HEALTHCHECK_PATH` tidak lagi memiliki default `/up`.
+- Jika variable tidak diset atau kosong, `web` dan `all` hanya memeriksa proses internal: Supervisor, PHP-FPM, dan Nginx; HTTP application probe dilewati.
+- Jika variable diisi, hanya endpoint tersebut yang diperiksa; fallback ke `/` tidak ada.
+- Docker `HEALTHCHECK` tetap aktif secara default. Pengguna yang ingin menonaktifkan seluruh container healthcheck dapat memakai `healthcheck: disable: true` pada deployment.
 
 ### Sebelum
 
-Jika `APP_HEALTHCHECK_PATH=/up` gagal, health check mencoba `/`. Aplikasi yang hanya memiliki route `/` dapat tetap dilaporkan `healthy` walaupun endpoint `/up` tidak tersedia.
+`APP_HEALTHCHECK_PATH` otomatis bernilai `/up`. Jika endpoint tersebut gagal, health check mencoba `/`, sehingga aplikasi lama dapat dilaporkan `healthy` berdasarkan endpoint yang tidak dipilih secara eksplisit.
 
 ### Sesudah
 
-Hanya status endpoint pada `APP_HEALTHCHECK_PATH` yang menentukan health. Default path tetap `/up`.
-
-### Tindakan pengguna
-
-Pilih salah satu:
-
-- Aplikasi memiliki `/up`: tidak perlu perubahan.
-- Aplikasi lama hanya memiliki `/`: set path secara eksplisit.
-- Aplikasi memakai endpoint lain: set endpoint tersebut secara eksplisit.
+Deployment lama yang tidak menetapkan variable berubah menjadi process-only healthcheck. Deployment yang ingin mempertahankan HTTP probe `/up` harus menetapkannya secara eksplisit:
 
 ```yaml
 environment:
-  APP_HEALTHCHECK_PATH: /
+  APP_HEALTHCHECK_PATH: /up
 ```
 
-Perubahan ini terutama berdampak pada role `web` dan `all`. Path yang dipilih harus mengembalikan HTTP 2xx.
+Untuk aplikasi yang memakai endpoint lain:
+
+```yaml
+environment:
+  APP_HEALTHCHECK_PATH: /health
+```
+
+Path yang diisi harus absolute dan mengembalikan HTTP 2xx. Perubahan ini berlaku terutama pada role `web` dan `all`; `worker` dan `scheduler` tetap hanya memeriksa proses internal.
 
 ## 4. Queue worker dan scheduler
 
@@ -166,7 +168,7 @@ Perubahan kontrak yang sama berlaku untuk bind mount dan immutable build. Yang b
 
 | Perubahan | Bind mount | Immutable build |
 | --- | --- | --- |
-| `APP_HEALTHCHECK_PATH` | Ubah Compose/manifest; route health berada pada source yang di-mount | Ubah manifest jika route sudah ada; jika menambah route `/up`, ubah source lalu rebuild image aplikasi |
+| `APP_HEALTHCHECK_PATH` | Set di Compose/manifest jika ingin HTTP probe; route berada pada source yang di-mount | Set di manifest jika ingin HTTP probe; jika menambah route, ubah source lalu rebuild image aplikasi |
 | `TZ` | Set pada Compose/manifest tiap service | Set pada manifest, atau bake sebagai `ENV` lalu rebuild jika memang ingin menjadi default image |
 | Hapus `QUEUE_CONCURRENCY` | Hapus dari Compose/manifest dan scale service `worker` | Hapus dari manifest/image config dan scale service `worker` |
 | Upload >5 MB | Set `NGINX_CLIENT_MAX_BODY_SIZE` di Compose/manifest | Set di manifest; jika ditulis sebagai `ENV` di Dockerfile aplikasi, rebuild image aplikasi |
@@ -180,6 +182,7 @@ services:
     image: indrahulu/laravel-base:php8.5
     environment:
       APP_ROLE: web
+      # Opsional: tambahkan jika ingin HTTP application probe.
       APP_HEALTHCHECK_PATH: /up
       TZ: Asia/Jakarta
       NGINX_CLIENT_MAX_BODY_SIZE: 100m
@@ -218,8 +221,8 @@ Perubahan `.agents/`, `AGENTS.md`, dan berkas audit adalah tooling/dokumentasi r
 
 ## Checklist migrasi
 
-- [ ] Pastikan health endpoint yang dipilih mengembalikan HTTP 2xx.
-- [ ] Set `APP_HEALTHCHECK_PATH` eksplisit jika tidak memakai `/up`.
+- [ ] Jika ingin HTTP application probe, pastikan endpoint yang dipilih mengembalikan HTTP 2xx.
+- [ ] Set `APP_HEALTHCHECK_PATH` eksplisit jika ingin mempertahankan probe `/up` atau memakai path lain.
 - [ ] Hapus `QUEUE_CONCURRENCY`.
 - [ ] Scale `worker` dengan replica container.
 - [ ] Audit monitoring dari `queue-worker_00` ke `queue-worker`.
@@ -232,7 +235,7 @@ Perubahan `.agents/`, `AGENTS.md`, dan berkas audit adalah tooling/dokumentasi r
 ## Sumber perubahan
 
 - Baseline: `git show 1cf96fcdefc5026af9a8073d9721972df1013c00:<path>`
-- Current: commit `ce38d9a`
+- Current: `HEAD` (the commit containing this report)
 - `Dockerfile`
 - `docker/bin/entrypoint.sh`
 - `docker/bin/healthcheck.sh`
@@ -241,4 +244,5 @@ Perubahan `.agents/`, `AGENTS.md`, dan berkas audit adalah tooling/dokumentasi r
 - `docker/supervisor/templates/queue-worker.conf.template`
 - `tests/docker-compose-smoke.yml`
 - `tests/smoke-test.sh`
+- `tests/fixture-app-no-health/`
 - `README.md`
