@@ -30,7 +30,7 @@ Repository harus berisi aplikasi Laravel dengan `composer.json` dan `package.jso
 Pastikan konfigurasi berikut ada. Jangan menambahkan key yang sama dua kali.
 
 ```php
-'asset_url' => env('ASSET_URL'),
+'asset_url' => env('ASSET_URL', env('APP_URL')),
 ```
 
 ### Mengapa perlu diubah?
@@ -58,7 +58,7 @@ Padahal URL yang benar adalah:
 http://localhost:8888/build/assets/app.css
 ```
 
-Compose mengisi `ASSET_URL` berdasarkan `APP_URL`, sehingga asset memakai alamat yang dapat dijangkau browser.
+Kedua file Compose tidak mengisi `ASSET_URL`. Fallback ke `APP_URL` membuat asset memakai alamat yang dapat dijangkau browser. Isi `ASSET_URL` hanya bila asset disajikan dari URL terpisah.
 
 ## 3. Sesuaikan `vite.config.js`
 
@@ -212,7 +212,7 @@ APP_GID=1000
 
 Gunakan hasil `id -u` dan `id -g`, bukan selalu `1000`.
 
-`ASSET_URL` tidak perlu ditambahkan ke `.env` untuk konfigurasi ini. Kedua file Compose mengisi `ASSET_URL` dari nilai `APP_URL`.
+`ASSET_URL` tidak perlu ditambahkan ke `.env` untuk konfigurasi ini karena `config/app.php` menggunakan `APP_URL` sebagai fallback. Isi `ASSET_URL` hanya bila asset disajikan dari URL terpisah.
 
 ### `.env.example`
 

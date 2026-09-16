@@ -8,7 +8,6 @@ services:
       APP_ROLE: all
       APP_UID: "${APP_UID:-}"
       APP_GID: "${APP_GID:-}"
-      ASSET_URL: "${APP_URL:-http://localhost:8080}"
       TZ: "${TZ:-Asia/Jakarta}"
       RUN_MIGRATIONS_ON_BOOT: "true"
     depends_on:

@@ -5,3 +5,5 @@
 vendor
 node_modules
 storage/logs
+public/build
+public/hot

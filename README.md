@@ -114,41 +114,16 @@ Diatur via environment variable `APP_ROLE`:
 | `scheduler` | `php artisan schedule:work` |
 | `all` | Semua proses via `supervisor` |
 
-Queue role `worker` menjalankan tepat satu proses `queue:work` per container. Untuk meningkatkan throughput, jalankan beberapa replica container `worker`; `QUEUE_CONCURRENCY` tidak lagi digunakan dan nilai lama akan diabaikan. Role `all` juga menjalankan tepat satu queue worker saat `QUEUE_ENABLED=true`.
+Queue role `worker` menjalankan tepat satu proses `queue:work` per container. Untuk meningkatkan throughput, jalankan beberapa replica container `worker`. Role `all` juga menjalankan tepat satu queue worker saat `QUEUE_ENABLED=true`.
 
 Role `scheduler` sebaiknya dijalankan sebagai satu replica per deployment. Jika membutuhkan lebih dari satu replica, aplikasi harus memakai distributed lock Laravel seperti `onOneServer` agar jadwal tidak berjalan ganda.
 
-### Bind Mount
+### Contoh Deployment
 
-Pola ini cocok untuk development atau staging. Source code dan `.env` di-mount dari host ke container.
+Pilih salah satu metode berikut:
 
-Panduan lengkap, termasuk Compose development dan production-like, tersedia di [panduan bind mount](https://github.com/indrahulu/laravel-base/blob/master/docs/example/bind-mount/README.md).
-
-### Build Immutable Image
-
-Pola ini cocok untuk production. Source code dan asset frontend di-build ke dalam image; saat runtime tidak ada bind mount source code.
-
-Contoh lengkap tersedia di:
-
-- [Dockerfile](https://github.com/indrahulu/laravel-base/blob/master/docs/example/immutable/Dockerfile)
-- [docker-compose.yml](https://github.com/indrahulu/laravel-base/blob/master/docs/example/immutable/docker-compose.yml)
-- [.dockerignore](https://github.com/indrahulu/laravel-base/blob/master/docs/example/immutable/.dockerignore)
-
-Dockerfile contoh menggunakan multi-stage build untuk:
-
-1. `npm ci` dan `npm run build` pada stage Node.js;
-2. menyalin source serta `public/build` ke image Laravel;
-3. menjalankan `composer install --no-dev`.
-
-Salin ketiga file tersebut ke root repo Laravel, siapkan `.env`, lalu jalankan:
-
-```bash
-docker compose up -d --build
-```
-
-Image immutable tidak membawa `.env`. Compose menyuntikkan `.env` melalui `env_file`, sedangkan source code tetap berada di dalam image. Named volume `storage` digunakan untuk file runtime seperti upload.
-
-`RUN_MIGRATIONS_ON_BOOT=true` pada contoh ditujukan untuk single instance/local. Untuk deployment multi-replica, jalankan migration job terpisah sebelum service aplikasi.
+- **[Bind mount](https://github.com/indrahulu/laravel-base/blob/master/docs/example/bind-mount/README.md):** source code dan `.env` di-mount dari host; cocok untuk development atau staging.
+- **[Image immutable](https://github.com/indrahulu/laravel-base/blob/master/docs/example/immutable/README.md):** source code dan asset frontend dibangun ke dalam image; cocok untuk production.
 
 ### Override UID/GID
 
@@ -258,57 +233,3 @@ Default upload efektif adalah `5 MB` dari Nginx. Untuk upload lebih besar, overr
 | `RUN_MIGRATIONS_ON_BOOT` | `false` | Jalankan `php artisan migrate --force` |
 | `RUN_SEEDERS_ON_BOOT` | `false` | Jalankan `php artisan db:seed --force` |
 | `RUN_QUEUE_RESTART_ON_BOOT` | `false` | Jalankan `php artisan queue:restart` |
-
-## Migration Notes
-
-Bagian ini diperlukan saat memindahkan aplikasi dari image atau konfigurasi lama.
-
-### Health check menjadi optional dan strict
-
-`APP_HEALTHCHECK_PATH` sekarang opsional. Jika tidak diset atau bernilai kosong, role `web` dan `all` tetap memeriksa Supervisor, PHP-FPM, dan Nginx, tetapi tidak melakukan HTTP application probe.
-
-Jika path diisi, hanya endpoint tersebut yang diperiksa; fallback otomatis ke `/` tidak ada. Aplikasi lama yang sebelumnya mengandalkan default `/up` harus menetapkannya secara eksplisit agar HTTP probe tetap aktif:
-
-```yaml
-environment:
-  APP_HEALTHCHECK_PATH: /up
-```
-
-Aplikasi yang hanya memiliki route `/` dapat menetapkan:
-
-```yaml
-environment:
-  APP_HEALTHCHECK_PATH: /
-```
-
-Jika path yang dipilih mengembalikan status HTTP non-2xx atau tidak dapat diakses, container menjadi `unhealthy`. Untuk menonaktifkan seluruh Docker healthcheck, bukan hanya HTTP probe, gunakan konfigurasi deployment berikut:
-
-```yaml
-healthcheck:
-  disable: true
-```
-
-### Queue tidak lagi memakai internal concurrency
-
-`QUEUE_CONCURRENCY` sudah dihapus dari kontrak image dan tidak lagi membuat beberapa proses `queue:work` dalam satu container. Hapus variable tersebut dari deployment lama. Untuk menaikkan throughput, scale replica role `worker`, misalnya:
-
-```bash
-docker compose up -d --scale worker=3 worker
-```
-
-Setiap replica menjalankan tepat satu worker. Jalankan scheduler sebagai satu replica; bila harus menjalankan lebih dari satu, aplikasi wajib memakai distributed lock Laravel seperti `onOneServer` agar jadwal tidak diproses ganda.
-
-### Default upload turun menjadi 5 MB
-
-Default operasional Nginx sekarang `NGINX_CLIENT_MAX_BODY_SIZE=5m`, sehingga request upload yang tidak dikonfigurasi ulang dibatasi sekitar 5 MB. PHP menyediakan ceiling `upload_max_filesize=500G` dan `post_max_size=501G`, tetapi limit efektif juga bergantung pada reverse proxy, timeout, temporary disk, dan storage aplikasi.
-
-Untuk aplikasi yang memang membutuhkan upload lebih besar, override limit Nginx secara eksplisit dan pastikan seluruh proxy di depannya memakai limit yang sama:
-
-```yaml
-environment:
-  NGINX_CLIENT_MAX_BODY_SIZE: 100m
-```
-
-### Timezone runtime
-
-Default timezone adalah `Asia/Jakarta`. `TZ` dapat diubah ke nama timezone IANA yang tersedia di image; entrypoint menerapkannya saat container start. Pastikan nilai `TZ` konsisten pada seluruh role aplikasi.

@@ -1,6 +1,3 @@
-# Salin Dockerfile ini ke root repo Laravel dan build dari root tersebut.
-# Pastikan build context memiliki .dockerignore yang mengecualikan .env dan secrets.
-
 FROM node:22-alpine AS frontend
 
 WORKDIR /app

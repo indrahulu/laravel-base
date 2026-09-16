@@ -4,28 +4,30 @@ services:
       context: .
       dockerfile: Dockerfile
     image: laravel-app:local
-    env_file:
-      - .env
     ports:
-      - "8080:8080"
-      - "8443:8443"
+      - "${PUBLISHED_HTTP_PORT:-8080}:8080"
+      - "${PUBLISHED_HTTPS_PORT:-8443}:8443"
     environment:
       APP_ROLE: all
+      APP_UID: "${APP_UID:-}"
+      APP_GID: "${APP_GID:-}"
       RUN_MIGRATIONS_ON_BOOT: "true"
       TZ: "${TZ:-Asia/Jakarta}"
     depends_on:
       db:
         condition: service_healthy
     volumes:
+      - ./.env:/var/www/html/.env:ro
       - storage:/var/www/html/storage
     restart: unless-stopped
 
   db:
     image: postgres:17-alpine
     environment:
-      POSTGRES_DB: "${POSTGRES_DB:-laravel}"
-      POSTGRES_USER: "${POSTGRES_USER:-laravel}"
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-laravel}"
+      TZ: "${TZ:-Asia/Jakarta}"
+      POSTGRES_DB: "${DB_DATABASE:?DB_DATABASE is required}"
+      POSTGRES_USER: "${DB_USERNAME:?DB_USERNAME is required}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD is required}"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
