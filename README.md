@@ -8,11 +8,7 @@ Base image Laravel production-ready berbasis `php-fpm-bookworm` dengan:
 - Self-signed SSL certificate (sudah di-generate di `docker/ssl/`)
 - Dukungan multi versi PHP: `8.2`, `8.3`, `8.4`, `8.5`
 
-Image ini dibangun dari [https://github.com/indrahulu/laravel-base](https://github.com/indrahulu/laravel-base).
-
-Image final hasil build dan push bisa diakses di:
-
-- https://hub.docker.com/r/indrahulu/laravel-base
+Image ini dibangun dari [https://github.com/indrahulu/laravel-base](https://github.com/indrahulu/laravel-base). Image final hasil build dan push bisa diakses di https://hub.docker.com/r/indrahulu/laravel-base
 
 ## Image Tags
 
@@ -126,38 +122,7 @@ Role `scheduler` sebaiknya dijalankan sebagai satu replica per deployment. Jika 
 
 Pola ini cocok untuk development atau staging. Source code dan `.env` di-mount dari host ke container.
 
-Contoh lengkap tersedia di [`docs/example/bind-mount/docker-compose.yml`](docs/example/bind-mount/docker-compose.yml). Contoh tersebut menyediakan:
-
-- `APP_ROLE=all`
-- PostgreSQL dengan named volume
-- migration otomatis saat startup
-- `env_file: .env`
-- bind mount source Laravel ke `/var/www/html`
-
-Salin Compose ke root repo Laravel, lalu jalankan:
-
-```bash
-cp docs/example/bind-mount/docker-compose.yml /path/to/your-laravel-app/docker-compose.yml
-cd /path/to/your-laravel-app
-docker compose up -d
-```
-
-`.env` aplikasi harus menyediakan minimal konfigurasi yang cocok dengan service `db`:
-
-```env
-APP_KEY=base64:...
-DB_CONNECTION=pgsql
-DB_HOST=db
-DB_PORT=5432
-DB_DATABASE=laravel
-DB_USERNAME=laravel
-DB_PASSWORD=laravel
-POSTGRES_DB=laravel
-POSTGRES_USER=laravel
-POSTGRES_PASSWORD=laravel
-```
-
-Untuk Linux, set `APP_UID` dan `APP_GID` sesuai user host jika permission bind mount bermasalah.
+Panduan lengkap, termasuk Compose development dan production-like, tersedia di [panduan bind mount](https://github.com/indrahulu/laravel-base/blob/master/docs/example/bind-mount/README.md).
 
 ### Build Immutable Image
 
@@ -165,9 +130,9 @@ Pola ini cocok untuk production. Source code dan asset frontend di-build ke dala
 
 Contoh lengkap tersedia di:
 
-- [`docs/example/immutable/Dockerfile`](docs/example/immutable/Dockerfile)
-- [`docs/example/immutable/docker-compose.yml`](docs/example/immutable/docker-compose.yml)
-- [`docs/example/immutable/.dockerignore`](docs/example/immutable/.dockerignore)
+- [Dockerfile](https://github.com/indrahulu/laravel-base/blob/master/docs/example/immutable/Dockerfile)
+- [docker-compose.yml](https://github.com/indrahulu/laravel-base/blob/master/docs/example/immutable/docker-compose.yml)
+- [.dockerignore](https://github.com/indrahulu/laravel-base/blob/master/docs/example/immutable/.dockerignore)
 
 Dockerfile contoh menggunakan multi-stage build untuk:
 

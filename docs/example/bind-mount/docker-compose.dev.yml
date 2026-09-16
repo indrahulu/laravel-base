@@ -1,0 +1,77 @@
+services:
+  app:
+    image: indrahulu/laravel-base:php8.5
+    ports:
+      - "${PUBLISHED_HTTP_PORT:-8080}:8080"
+      - "${PUBLISHED_HTTPS_PORT:-8443}:8443"
+    environment:
+      APP_ROLE: all
+      APP_UID: "${APP_UID:-}"
+      APP_GID: "${APP_GID:-}"
+      ASSET_URL: "${APP_URL:-http://localhost:8080}"
+      TZ: "${TZ:-Asia/Jakarta}"
+      RUN_MIGRATIONS_ON_BOOT: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+      composer-install:
+        condition: service_completed_successfully
+    volumes:
+      - ".:/var/www/html"
+    restart: unless-stopped
+
+  composer-install:
+    image: indrahulu/laravel-base:php8.5
+    working_dir: /var/www/html
+    entrypoint: ["sh", "-c"]
+    command: ["git config --global safe.directory /var/www/html && exec composer install --no-interaction --prefer-dist --optimize-autoloader"]
+    environment:
+      TZ: "${TZ:-Asia/Jakarta}"
+    volumes:
+      - ".:/var/www/html"
+    restart: "no"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 1G
+
+  frontend:
+    image: node:22-alpine
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NPM_CONFIG_CACHE: /tmp/npm-cache
+      PUBLISHED_VITE_PORT: "${PUBLISHED_VITE_PORT:-5173}"
+      TZ: "${TZ:-Asia/Jakarta}"
+    volumes:
+      - ".:/var/www/html"
+    ports:
+      - "${PUBLISHED_VITE_PORT:-5173}:${PUBLISHED_VITE_PORT:-5173}"
+    command: sh -c "cd /var/www/html && npm install && npm run dev"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 1G
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      TZ: "${TZ:-Asia/Jakarta}"
+      POSTGRES_DB: "${DB_DATABASE:?DB_DATABASE is required}"
+      POSTGRES_USER: "${DB_USERNAME:?DB_USERNAME is required}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD is required}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - db:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  db:
