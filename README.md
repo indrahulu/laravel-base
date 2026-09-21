@@ -3,7 +3,7 @@
 Base image Laravel production-ready berbasis `php-fpm-bookworm` dengan:
 
 - `nginx`, `php-fpm`, `supervisor`, `composer`
-- Extensions: `bcmath`, `curl`, `exif`, `gd`, `imagick`, `intl`, `mysqli`, `opcache`, `pcntl`, `pdo_mysql`, `pdo_pgsql`, `pgsql`, `redis`, `sockets`, `zip`
+- Extensions: `bcmath`, `curl`, `exif`, `gd`, `imagick`, `intl`, `mysqli`, `opcache`, `pcntl`, `pdo_mysql`, `pdo_pgsql`, `pdo_sqlite`, `pgsql`, `redis`, `sockets`, `zip`
 - 4 runtime roles: `web`, `worker`, `scheduler`, `all`
 - Self-signed SSL certificate (sudah di-generate di `docker/ssl/`)
 - Dukungan multi versi PHP: `8.2`, `8.3`, `8.4`, `8.5`
