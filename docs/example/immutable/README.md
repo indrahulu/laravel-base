@@ -1,8 +1,8 @@
 # Metode Immutable
 
-Panduan ini menjelaskan cara menjalankan aplikasi Laravel sebagai image immutable untuk production. Source code dan asset frontend dibangun ke dalam image; saat runtime tidak ada bind mount source code.
+Panduan ini menjelaskan cara menjalankan aplikasi Laravel dengan image immutable di production. Source code dan asset frontend masuk ke dalam image, sehingga source code tidak perlu di-bind mount saat runtime.
 
-File berikut harus diletakkan di root repository aplikasi:
+Letakkan file berikut di root repository aplikasi:
 
 ```text
 Dockerfile
@@ -12,23 +12,19 @@ docker-compose.yml
 
 ## 1. Salin file
 
-Salin ketiga file tersebut ke root repository aplikasi. Repository harus memiliki `composer.json`, `package.json`, dan `package-lock.json`.
-
-Pastikan `.env` sudah dibuat dari `.env.example` dan memiliki `APP_KEY` yang valid. File ini tidak ikut dibangun ke image, tetapi di-mount read-only saat container berjalan.
+Salin ketiga file tersebut ke root repository. Buat `.env` dari `.env.example` dan pastikan `APP_KEY` sudah diisi dengan nilai yang valid.
 
 ## 2. Sesuaikan `config/app.php`
 
-Pastikan konfigurasi berikut ada. Jangan menambahkan key yang sama dua kali.
+Pastikan konfigurasi berikut tercantum satu kali:
 
 ```php
 'asset_url' => env('ASSET_URL', env('APP_URL')),
 ```
 
-### Mengapa perlu diubah?
+### Konfigurasi URL asset
 
-Laravel memakai konfigurasi ini sebagai basis URL untuk `asset()` dan asset production.
-
-Pada Compose, port internal container berbeda dengan port yang dilihat browser. Contohnya:
+Laravel menggunakan konfigurasi ini sebagai basis URL untuk `asset()` dan asset production. Di Compose, port internal container bisa berbeda dari port yang digunakan browser. Contoh:
 
 ```text
 Container app: 8080
@@ -47,11 +43,11 @@ Padahal URL yang benar adalah:
 http://localhost:8888/build/assets/app.css
 ```
 
-Fallback ke `APP_URL` membuat asset memakai alamat yang dapat dijangkau browser. Isi `ASSET_URL` hanya bila asset disajikan dari URL terpisah.
+Dengan fallback ke `APP_URL`, URL asset dapat dijangkau browser. Isi `ASSET_URL` jika asset disajikan dari URL terpisah.
 
-## 3. Tambahkan variable ke `.env`
+## 3. Tambahkan variabel ke `.env`
 
-Gunakan contoh berikut untuk Docker Compose lokal:
+Untuk Docker Compose lokal, gunakan konfigurasi berikut:
 
 ```env
 APP_URL=http://localhost:8080
@@ -67,14 +63,10 @@ DB_USERNAME=laravel
 DB_PASSWORD=laravel
 ```
 
-Jika aplikasi diakses dari komputer lain, gunakan alamat publik yang sama dengan alamat yang diketik di browser. Contoh:
+Jika pengguna mengakses aplikasi dari komputer lain, atur `APP_URL` ke alamat dan port yang mereka masukkan di browser. Contoh:
 
 ```env
 APP_URL=http://192.168.0.1:8888
-
-PUBLISHED_HTTP_PORT=8888
-PUBLISHED_HTTPS_PORT=4444
-TZ=Asia/Jakarta
 ```
 
 Atau menggunakan hostname:
@@ -83,18 +75,15 @@ Atau menggunakan hostname:
 APP_URL=http://server1:8888
 ```
 
-Hostname tersebut harus dapat di-resolve oleh komputer pengguna. Port aplikasi juga harus diizinkan oleh firewall.
+Pastikan komputer pengguna dapat me-resolve hostname tersebut dan firewall mengizinkan port aplikasi.
 
-### Keterangan variable
+### Keterangan variabel
 
-| Variable | Fungsi |
+| Variabel | Fungsi |
 |---|---|
 | `APP_URL` | URL publik aplikasi yang digunakan Laravel dan URL asset. Sertakan hostname serta port. |
 | `PUBLISHED_HTTP_PORT` | Port host untuk HTTP aplikasi. Dipetakan ke port `8080` di container `app`. |
 | `PUBLISHED_HTTPS_PORT` | Port host untuk HTTPS aplikasi. Dipetakan ke port `8443` di container `app`. |
-| `TZ` | Timezone container aplikasi dan PostgreSQL. Default Compose: `Asia/Jakarta`. |
-| `APP_UID` | UID user container. Opsional; biasanya tidak diperlukan untuk image immutable. |
-| `APP_GID` | GID group container. Opsional; digunakan bersama `APP_UID`. |
 | `DB_CONNECTION` | Driver database Laravel. Untuk Compose: `pgsql`. |
 | `DB_HOST` | Host database dari dalam container app. Gunakan `db`, bukan `localhost`. |
 | `DB_PORT` | Port PostgreSQL dari dalam network Compose. Gunakan `5432`. |
@@ -102,27 +91,9 @@ Hostname tersebut harus dapat di-resolve oleh komputer pengguna. Port aplikasi j
 | `DB_USERNAME` | Username PostgreSQL. Wajib diisi oleh Compose. |
 | `DB_PASSWORD` | Password PostgreSQL. Wajib diisi oleh Compose. |
 
-`DB_DATABASE`, `DB_USERNAME`, dan `DB_PASSWORD` wajib tersedia. Compose akan berhenti dengan error jika salah satunya kosong.
+Compose akan berhenti dengan error jika `DB_DATABASE`, `DB_USERNAME`, atau `DB_PASSWORD` tidak diisi.
 
-`ASSET_URL` tidak perlu ditambahkan ke `.env` karena `config/app.php` menggunakan `APP_URL` sebagai fallback. Isi hanya bila asset disajikan dari URL terpisah.
-
-### `.env.example`
-
-Tambahkan variable yang sama ke `.env.example` agar user berikutnya tahu konfigurasi yang diperlukan. Jangan menyimpan password production asli di `.env.example`.
-
-```env
-APP_URL=http://localhost:8080
-
-PUBLISHED_HTTP_PORT=8080
-PUBLISHED_HTTPS_PORT=8443
-
-DB_CONNECTION=pgsql
-DB_HOST=db
-DB_PORT=5432
-DB_DATABASE=laravel
-DB_USERNAME=laravel
-DB_PASSWORD=laravel
-```
+Tambahkan `ASSET_URL` ke `.env` hanya jika asset disajikan dari URL terpisah. Jika tidak, `config/app.php` memakai `APP_URL`.
 
 ## Menjalankan production
 
@@ -132,17 +103,17 @@ Build dan jalankan stack:
 docker compose up -d --build
 ```
 
-Proses build menginstal dependency PHP, membangun asset frontend, lalu menyalin hasilnya ke image aplikasi. `.dockerignore` mengecualikan `.env`, dependency hasil install lokal, log, dan hasil asset lama agar image dibangun dari source yang bersih.
+Build menginstal dependency PHP, membuat asset frontend, lalu menyalinnya ke image aplikasi. `.dockerignore` mengecualikan `.env`, dependency lokal, log, dan asset lama dari proses build.
 
-Buka URL yang ada pada `APP_URL`, bukan selalu `localhost`. Contoh:
+Buka alamat yang tercantum di `APP_URL`, misalnya:
 
 ```text
 http://192.168.0.1:8888
 ```
 
-Container `app` menunggu PostgreSQL sehat sebelum dijalankan. Contoh ini menjalankan migration saat boot melalui `RUN_MIGRATIONS_ON_BOOT=true`; gunakan hanya untuk single instance. Pada deployment multi-replica, jalankan migration job terpisah sebelum service aplikasi.
+Container `app` menunggu PostgreSQL sehat sebelum mulai. Contoh ini menjalankan migration saat boot dengan `RUN_MIGRATIONS_ON_BOOT=true`, yang hanya cocok untuk single instance. Untuk deployment multi-replica, jalankan migration job terpisah sebelum service aplikasi.
 
-Image tidak membawa `.env`. Compose me-mount `.env` sebagai file read-only, sedangkan source code tetap berada di dalam image. Named volume `storage` menyimpan file runtime seperti upload, dan volume `db` menyimpan data PostgreSQL.
+Image tidak menyertakan `.env`. Compose me-mount file tersebut dalam mode read-only. Source code tetap berada di dalam image, named volume `storage` menyimpan file runtime seperti upload, dan volume `db` menyimpan data PostgreSQL.
 
 Setelah source code atau dependency berubah, build ulang image:
 
@@ -159,7 +130,7 @@ docker compose ps -a
 docker compose logs app db
 ```
 
-Jika database belum healthy, `app` belum dijalankan. Jika build gagal, jalankan kembali tanpa detached mode untuk melihat error lengkap:
+Jika database belum healthy, container `app` belum mulai. Untuk melihat error build secara lengkap, jalankan perintah tanpa detached mode:
 
 ```bash
 docker compose up --build
@@ -179,4 +150,4 @@ Jika variable database wajib belum diisi, Compose akan menampilkan error seperti
 DB_DATABASE is required
 ```
 
-Itu berarti `.env` belum berisi konfigurasi database yang diperlukan.
+Isi konfigurasi database yang diperlukan di `.env`.
