@@ -9,10 +9,7 @@ services:
       - "${PUBLISHED_HTTPS_PORT:-8443}:8443"
     environment:
       APP_ROLE: all
-      APP_UID: "${APP_UID:-}"
-      APP_GID: "${APP_GID:-}"
       RUN_MIGRATIONS_ON_BOOT: "true"
-      TZ: "${TZ:-Asia/Jakarta}"
     depends_on:
       db:
         condition: service_healthy
