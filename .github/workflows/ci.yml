@@ -30,6 +30,7 @@ jobs:
       - name: Build image
         run: >
           docker build
+          --pull
           --build-arg PHP_VERSION=${{ matrix.php }}
           -t ${{ env.REGISTRY }}:php${{ matrix.php }}
           .
